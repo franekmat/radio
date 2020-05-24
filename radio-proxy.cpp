@@ -180,25 +180,24 @@ std::string getHeader(std::string &buffer) {
 
 /* receive header and return response status */
 std::string handleHeader(int &sock, std::string &buffer) {
-  std::string response = "", header;
-  buffer.resize(BUFFER_SIZE);
+  std::string tmp = "";
   ssize_t rcv_len = 1;
 
   while (rcv_len > 0) {
-    rcv_len = read(sock, &buffer[0], BUFFER_SIZE - 1);
+    tmp.resize(BUFFER_SIZE);
+    rcv_len = read(sock, &tmp[0], BUFFER_SIZE - 1);
     if (rcv_len < 0) {
       error("read");
     }
-    buffer.resize(rcv_len);
-    response += buffer;
+    tmp.resize(rcv_len);
+    buffer += tmp;
 
     if (containsEndOfHeader(buffer)) {
-      header = getHeader(buffer);
       break;
     }
   }
 
-  return header;
+  return getHeader(buffer);
 }
 
 void readDataWithoutMeta(int &sock, std::string &buffer) {
@@ -292,6 +291,8 @@ void handleResponse(int &sock) {
   if (containsMeta(header)) {
     metaIntVal = getMetaInt(header);
   }
+
+  // std::cerr << "metaint = " << metaIntVal << "\n";
 
   if (metaIntVal == -1) {
     readDataWithoutMeta(sock, buffer);
