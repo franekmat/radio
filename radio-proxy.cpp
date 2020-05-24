@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <poll.h>
 #include "err.h"
 
 #define DEFAULT_TIMEOUT 5
@@ -164,6 +165,13 @@ std::string setRequest (std::string host, std::string resource, std::string meta
   return message;
 }
 
+// void setTimeout(int &sock, int time) {
+//   struct timeval timeout;
+//   timeout.tv_sec = time;
+// 	timeout.tv_usec = 0;
+//   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof timeout);
+// }
+
 void setConnection(int &sock, std::string &host, int &port, struct addrinfo *addr_hints, struct addrinfo **addr_result) {
   memset(addr_hints, 0, sizeof(struct addrinfo));
   addr_hints->ai_family = AF_INET;
@@ -182,16 +190,10 @@ void setConnection(int &sock, std::string &host, int &port, struct addrinfo *add
   if (sock < 0) {
     error("socket");
   }
+
   if (connect(sock, (*addr_result)->ai_addr, (*addr_result)->ai_addrlen) < 0) {
     error("connect");
   }
-}
-
-void setTimeout(int &sock, int time) {
-  struct timeval timeout;
-  timeout.tv_sec = time;
-	timeout.tv_usec = 0;
-  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof timeout);
 }
 
 void sendRequest(int &sock, std::string &message) {
@@ -249,12 +251,16 @@ std::string getHeader(std::string &buffer) {
 }
 
 /* receive header and return response status */
-std::string handleHeader(int &sock, std::string &buffer) {
+std::string handleHeader(int &sock, std::string &buffer, int timeout) {
   std::string tmp = "";
   ssize_t rcv_len = 1;
+  struct pollfd fds[1] = {{sock, 0 | POLLIN}};
 
   while (rcv_len > 0) {
     tmp.resize(BUFFER_SIZE);
+    if (poll(fds, 1, timeout * 1000) == 0) {
+      error("Read timeout");
+    }
     rcv_len = read(sock, &tmp[0], BUFFER_SIZE - 1);
     if (rcv_len < 0) {
       error("read");
@@ -270,12 +276,17 @@ std::string handleHeader(int &sock, std::string &buffer) {
   return getHeader(buffer);
 }
 
-void readDataWithoutMeta(int &sock, std::string &buffer) {
+void readDataWithoutMeta(int &sock, std::string &buffer, int timeout) {
   std::cout << buffer;
   buffer.resize(BUFFER_SIZE);
+  struct pollfd fds[1] = {{sock, 0 | POLLIN}};
   ssize_t rcv_len = 1;
+
   while (rcv_len > 0) {
     buffer.resize(BUFFER_SIZE);
+    if (poll(fds, 1, timeout * 1000) == 0) {
+      error("Read timeout");
+    }
     rcv_len = read(sock, &buffer[0], BUFFER_SIZE - 1);
     if (rcv_len < 0) {
       error("read");
@@ -286,16 +297,21 @@ void readDataWithoutMeta(int &sock, std::string &buffer) {
 }
 
 /* I know that buffer is not empty */
-void readMeta (int &sock, std::string &buffer) {
+void readMeta (int &sock, std::string &buffer, int timeout) {
   int size = (int)buffer[0] * 16;
   // std::cerr << "usuwam 1 (" << size / 16 << ")\n";
   buffer.erase(0, 1);
 
   if (buffer.size() < size) {
     std::string tmp = "";
+    struct pollfd fds[1] = {{sock, 0 | POLLIN}};
     ssize_t rcv_len = 1;
+
     while (rcv_len > 0) {
       tmp.resize(BUFFER_SIZE);
+      if (poll(fds, 1, timeout * 1000) == 0) {
+        error("Read timeout");
+      }
       rcv_len = read(sock, &tmp[0], BUFFER_SIZE - 1);
       if (rcv_len < 0) {
         error("read");
@@ -316,14 +332,19 @@ void readMeta (int &sock, std::string &buffer) {
   }
 }
 
-void readDataWithMeta(int &sock, std::string &buffer, int size) {
+void readDataWithMeta(int &sock, std::string &buffer, int size, int timeout) {
   int counter = size;
   std::string tmp = "";
+  struct pollfd fds[1] = {{sock, 0 | POLLIN}};
   ssize_t rcv_len = 1;
+
   while (rcv_len > 0 || !buffer.empty()) {
     // i do not have yet buffer filled with data
     if (buffer.size() < counter || counter == 0) {
       tmp.resize(BUFFER_SIZE);
+      if (poll(fds, 1, timeout * 1000) == 0) {
+        error("Read timeout");
+      }
       rcv_len = read(sock, &tmp[0], BUFFER_SIZE - 1);
       if (rcv_len < 0) {
         error("read");
@@ -342,15 +363,15 @@ void readDataWithMeta(int &sock, std::string &buffer, int size) {
       // std::cerr << counter << "\n";
       std::cout << buffer.substr(0, counter);
       buffer.erase(0, counter);
-      readMeta(sock, buffer);
+      readMeta(sock, buffer, timeout);
       counter = size;
     }
   }
 }
 
-void handleResponse(int &sock, std::string &meta) {
+void handleResponse(int &sock, std::string &meta, int timeout) {
   std::string buffer = "";
-  std::string header = handleHeader(sock, buffer);
+  std::string header = handleHeader(sock, buffer, timeout);
 
   std::string status = getStatus(header);
   if (!okStatus(status)) {
@@ -365,13 +386,13 @@ void handleResponse(int &sock, std::string &meta) {
   // std::cerr << "metaint = " << metaIntVal << "\n";
 
   if (metaIntVal == -1) {
-    readDataWithoutMeta(sock, buffer);
+    readDataWithoutMeta(sock, buffer, timeout);
   }
   else {
     if (meta != "yes") {
       error("We did not ask server for meta data");
     }
-    readDataWithMeta(sock, buffer, metaIntVal);
+    readDataWithMeta(sock, buffer, metaIntVal, timeout);
   }
 }
 
@@ -390,8 +411,7 @@ int main(int argc, char** argv) {
   std::string message = setRequest(host, resource, meta);
   sendRequest(sock, message);
 
-  setTimeout(sock, timeout);
-  handleResponse(sock, meta);
+  handleResponse(sock, meta, timeout);
 
   return 0;
 }
