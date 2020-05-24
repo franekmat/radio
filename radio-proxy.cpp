@@ -167,7 +167,7 @@ std::string getStatus (std::string &header) {
 }
 
 bool okStatus (std::string &status) {
-  return (status == "HTTP/1.0 200 OK" || status == "ICY 200 OK");
+  return (status == "HTTP/1.0 200 OK" || status == "HTTP/1.1 200 OK" || status == "ICY 200 OK");
 }
 
 /* cut header from buffer and return header */
