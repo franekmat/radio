@@ -154,6 +154,13 @@ void setConnection(int &sock, std::string &host, int &port, struct addrinfo *add
   }
 }
 
+void setTimeout(int &sock, int time) {
+  struct timeval timeout;
+  timeout.tv_sec = time;
+	timeout.tv_usec = 0;
+  setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof timeout);
+}
+
 void sendRequest(int &sock, std::string &message) {
   ssize_t len = message.size();
   if (write(sock, message.c_str(), len) != len) {
@@ -346,6 +353,7 @@ int main(int argc, char** argv) {
   std::string message = setRequest(host, resource, meta);
   sendRequest(sock, message);
 
+  setTimeout(sock, timeout);
   handleResponse(sock, meta);
 
   return 0;
