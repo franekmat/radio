@@ -30,6 +30,10 @@ void checkResource (std::string resource) {
   //check if proper value
 }
 
+void checkMulti (std::string multi) {
+  //check if proper value
+}
+
 /* I use std:stoi so for example "123abcdefg" is a proper integer, equal to "123" */
 void checkPort (std::string port) {
   try {
@@ -65,14 +69,19 @@ void checkTimeout (std::string timeout) {
 	}
 }
 
-void parseInput(int argc, char **argv, std::string &host, std::string &resource, int &port, std::string &meta, int &timeout) {
+void printUsageError(std::string name) {
+  std::string err_msg = "Usage: " + name + " -h host -r resource -p port -m yes|no -t timeout -P port -B multi -T timeout";
+  error(err_msg);
+}
+
+void parseInput(int argc, char **argv, std::string &host, std::string &resource,
+  int &port, std::string &meta, int &timeout, int &port_client, int &timeout_client, std::string &multi) {
   int opt;
   bool host_inp = false, resource_inp = false, port_inp = false;
+  bool port_client_inp = false;
 
   if (argc < 3) {
-    std::string name = argv[0];
-    std::string err_msg = "Usage: " + name + " -h host -r resource -p port -m yes|no -t timeout";
-    error(err_msg);
+    printUsageError(argv[0]);
   }
 
   while ((opt = getopt(argc, argv, "h:r:p:m:t:")) != EOF) {
@@ -102,19 +111,30 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
         /*  I checked if tiemout is a proper integer so no need to check it again */
         timeout = std::stoi(optarg);
         break;
+      case 'P' :
+        checkPort(optarg);
+        port_client_inp = true;
+        /*  I checked if port is a proper integer so no need to check it again */
+        port_client = std::stoi(optarg);
+        break;
+      case 'B' :
+        checkMulti(optarg);
+        multi = optarg;
+        break;
+      case 'T' :
+        checkTimeout(optarg); //not sure if rules are the same as in -t case
+        /*  I checked if tiemout is a proper integer so no need to check it again */
+        timeout_client = std::stoi(optarg);
+        break;
       case '?' :
-        //uzupelnic usage
-        fprintf(stderr, "usage ...");
+        printUsageError(argv[0]);
       default:
-        std::cout << "\n";
-        //wrong parameter
-        abort();
+        printUsageError(argv[0]);
     }
   }
 
-  if (!host_inp || !resource_inp || !port_inp) {
-    //te parametry są obowiązkowe
-    abort();
+  if (!host_inp || !resource_inp || !port_inp) { //dodać port_client_inp
+    printUsageError(argv[0]);
   }
 }
 
@@ -347,8 +367,10 @@ int main(int argc, char** argv) {
   int port = -1, timeout = DEFAULT_TIMEOUT, sock;
   std::string host = "", resource = "", meta = DEFAULT_META;
   struct addrinfo addr_hints, *addr_result = NULL;
+  int port_client = -1, timeout_client = DEFAULT_TIMEOUT;
+  std::string multi = "";
 
-  parseInput(argc, argv, host, resource, port, meta, timeout);
+  parseInput(argc, argv, host, resource, port, meta, timeout, port_client, timeout_client, multi);
 
   setConnection(sock, host, port, &addr_hints, &addr_result);
   freeaddrinfo(addr_result);
