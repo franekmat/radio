@@ -31,15 +31,33 @@ void checkResource (std::string resource) {
 }
 
 void checkPort (std::string port) {
-  //check if proper value
+  try {
+    int port_value = std::stoi(port);
+  }
+  catch (std::invalid_argument const &e) {
+		error("Bad input: std::invalid_argument thrown");
+	}
+	catch (std::out_of_range const &e) {
+		error("Integer overflow: std::out_of_range thrown");
+	}
 }
 
 void checkMeta (std::string meta) {
-  //check if proper value
+  if (meta != "yes" && meta != "no") {
+    error ("Wrong format of meta argument");
+  }
 }
 
 void checkTimeout (std::string timeout) {
-  //check if proper value
+  try {
+    int timeout_value = std::stoi(timeout);
+  }
+  catch (std::invalid_argument const &e) {
+		error("Bad input: std::invalid_argument thrown");
+	}
+	catch (std::out_of_range const &e) {
+		error("Integer overflow: std::out_of_range thrown");
+	}
 }
 
 void parseInput(int argc, char **argv, std::string &host, std::string &resource, int &port, std::string &meta, int &timeout) {
@@ -58,29 +76,26 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
         checkHostName(optarg);
         host = optarg;
         host_inp = true;
-        // std::cout << "host = " << host << "\n";
         break;
       case 'r' :
         checkResource(optarg);
         resource = optarg;
         resource_inp = true;
-        // std::cout << "resource = " << resource << "\n";
         break;
       case 'p' :
         checkPort(optarg);
         port_inp = true;
-        port = atoi(optarg);
-        // std::cout << "port = " << port << "\n";
+        /*  I checked if port is a proper integer so no need to check it again */
+        port = std::stoi(optarg);
         break;
       case 'm' :
         checkMeta(optarg);
         meta = optarg;
-        // std::cout << "meta = " << meta << "\n";
         break;
       case 't' :
         checkTimeout(optarg);
-        timeout = atoi(optarg);
-        // std::cout << "timeout = " << timeout << "\n";
+        /*  I checked if tiemout is a proper integer so no need to check it again */
+        timeout = std::stoi(optarg);
         break;
       case '?' :
         //uzupelnic usage
@@ -156,14 +171,12 @@ int getMetaInt (std::string header) {
   std::string value = header.substr(0, header.find("\r\n"));
   int ret_value;
   try {
-    ret_value = stoi(value);
+    ret_value = std::stoi(value);
   }
-  catch (std::invalid_argument const &e)
-	{
+  catch (std::invalid_argument const &e) {
 		error("Bad input: std::invalid_argument thrown");
 	}
-	catch (std::out_of_range const &e)
-	{
+	catch (std::out_of_range const &e) {
 		error("Integer overflow: std::out_of_range thrown");
 	}
   return ret_value;
