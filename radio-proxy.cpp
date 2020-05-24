@@ -30,6 +30,7 @@ void checkResource (std::string resource) {
   //check if proper value
 }
 
+/* I use std:stoi so for example "123abcdefg" is a proper integer, equal to "123" */
 void checkPort (std::string port) {
   try {
     int port_value = std::stoi(port);
@@ -48,6 +49,7 @@ void checkMeta (std::string meta) {
   }
 }
 
+/* I use std:stoi so for example "123abcdefg" is a proper integer, equal to "123" */
 void checkTimeout (std::string timeout) {
   try {
     int timeout_value = std::stoi(timeout);
@@ -171,6 +173,7 @@ int getMetaInt (std::string header) {
   std::string value = header.substr(0, header.find("\r\n"));
   int ret_value;
   try {
+    /* I use std:stoi so for example "123abcdefg" is a proper integer, equal to "123" */
     ret_value = std::stoi(value);
   }
   catch (std::invalid_argument const &e) {
