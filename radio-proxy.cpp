@@ -154,7 +154,19 @@ int getMetaInt (std::string header) {
   std::size_t found = header.find("icy-metaint:");
   header.erase(0, found + strlen("icy-metaint:"));
   std::string value = header.substr(0, header.find("\r\n"));
-  return stoi(value); //tu jakieś warunki try catche ify dodać czy coś
+  int ret_value;
+  try {
+    ret_value = stoi(value);
+  }
+  catch (std::invalid_argument const &e)
+	{
+		error("Bad input: std::invalid_argument thrown");
+	}
+	catch (std::out_of_range const &e)
+	{
+		error("Integer overflow: std::out_of_range thrown");
+	}
+  return ret_value;
 }
 
 bool containsEndOfHeader(std::string &buffer) {
