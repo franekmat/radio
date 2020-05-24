@@ -306,7 +306,7 @@ void readDataWithMeta(int &sock, std::string &buffer, int size) {
   }
 }
 
-void handleResponse(int &sock) {
+void handleResponse(int &sock, std::string &meta) {
   std::string buffer = "";
   std::string header = handleHeader(sock, buffer);
 
@@ -326,6 +326,9 @@ void handleResponse(int &sock) {
     readDataWithoutMeta(sock, buffer);
   }
   else {
+    if (meta != "yes") {
+      error("We did not ask server for meta data");
+    }
     readDataWithMeta(sock, buffer, metaIntVal);
   }
 }
@@ -343,7 +346,7 @@ int main(int argc, char** argv) {
   std::string message = setRequest(host, resource, meta);
   sendRequest(sock, message);
 
-  handleResponse(sock);
+  handleResponse(sock, meta);
 
   return 0;
 }
