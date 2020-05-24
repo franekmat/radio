@@ -15,10 +15,11 @@
 #define DEFAULT_META "no"
 #define BUFFER_SIZE 1000005
 
-void error(const char *err_message)
+void error(std::string err_msg)
 {
-    perror(err_message);
-    exit(1);
+  const char *err_message = err_msg.c_str();
+  perror(err_message);
+  exit(1);
 }
 
 void checkHostName (std::string host) {
@@ -48,7 +49,7 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
   if (argc < 3) {
     std::string name = argv[0];
     std::string err_msg = "Usage: " + name + " -h host -r resource -p port -m yes|no -t timeout";
-    error(err_msg.c_str());
+    error(err_msg);
   }
 
   while ((opt = getopt(argc, argv, "h:r:p:m:t:")) != EOF) {
@@ -97,14 +98,19 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
   }
 }
 
-std::string setRequest (std::string host, std::string resource) {
+std::string setRequest (std::string host, std::string resource, std::string meta) {
   std::string message =
                    "GET " + resource + " HTTP/1.0\r\n" +
                    "Host: " + host + "\r\n" +
                    "User-Agent: Orban/Coding Technologies AAC/aacPlus Plugin 1.0 (os=Windows NT 5.1 Service Pack 2)\r\n" +
-                   "Accept: */*\r\n" +
-                   // "Icy-MetaData: 1\r\n" +
-                   "Connection: close\r\n" + "\r\n";
+                   "Accept: */*\r\n";
+
+  if (meta == "yes") {
+    message += "Icy-MetaData: 1\r\n";
+  }
+
+  message += "Connection: close\r\n\r\n";
+
   return message;
 }
 
@@ -140,12 +146,15 @@ void sendRequest(int &sock, std::string &message) {
 
 /* check if received header contains icy-metaint */
 bool containsMeta (std::string header) {
-  return false;
+  return (header.find("icy-metaint:") != std::string::npos);
 }
 
 /* get icy-metaint value from header */
 int getMetaInt (std::string header) {
-  return 1;
+  std::size_t found = header.find("icy-metaint:");
+  header.erase(0, found + strlen("icy-metaint:"));
+  std::string value = header.substr(0, header.find("\r\n"));
+  return stoi(value); //tu jakieś warunki try catche ify dodać czy coś
 }
 
 bool containsEndOfHeader(std::string &buffer) {
@@ -153,7 +162,12 @@ bool containsEndOfHeader(std::string &buffer) {
 }
 
 std::string getStatus (std::string &header) {
-  return header;
+  std::size_t found = header.find("\r\n");
+  return header.substr(0, found);
+}
+
+bool okStatus (std::string &status) {
+  return (status == "HTTP/1.0 200 OK" || status == "ICY 200 OK");
 }
 
 /* cut header from buffer and return header */
@@ -167,13 +181,13 @@ std::string getHeader(std::string &buffer) {
 /* receive header and return response status */
 std::string handleHeader(int &sock, std::string &buffer) {
   std::string response = "", header;
+  buffer.resize(BUFFER_SIZE);
   ssize_t rcv_len = 1;
 
   while (rcv_len > 0) {
     rcv_len = read(sock, &buffer[0], BUFFER_SIZE - 1);
     if (rcv_len < 0) {
-      std::string err_msg = "read";
-      error(err_msg.c_str());
+      error("read");
     }
     buffer.resize(rcv_len);
     response += buffer;
@@ -184,31 +198,72 @@ std::string handleHeader(int &sock, std::string &buffer) {
     }
   }
 
-  return getStatus(header);
+  return header;
 }
 
-void handleResponse(int &sock) {
-  std::string buffer;
-  buffer.resize(BUFFER_SIZE);
-
-  std::string status = handleHeader(sock, buffer);
-
-  if (0) {
-
-  }
-
+void readDataWithoutMeta(int &sock, string &buffer) {
   std::cout << buffer;
-
+  buffer.resize(BUFFER_SIZE);
   ssize_t rcv_len = 1;
   while (rcv_len > 0) {
     buffer.resize(BUFFER_SIZE);
     rcv_len = read(sock, &buffer[0], BUFFER_SIZE - 1);
     if (rcv_len < 0) {
-      std::string err_msg = "read";
-      error(err_msg.c_str());
+      error("read");
     }
     buffer.resize(rcv_len);
     std::cout << buffer;
+  }
+}
+
+void readDataWithMeta(int &sock, string &buffer, int size) {
+  int counter = size;
+  std::cout << buffer;
+  buffer.resize(BUFFER_SIZE);
+  ssize_t rcv_len = 1;
+  while (rcv_len > 0) {
+    buffer.resize(BUFFER_SIZE);
+    rcv_len = read(sock, &buffer[0], BUFFER_SIZE - 1);
+    if (rcv_len < 0) {
+      error("read");
+    }
+    buffer.resize(rcv_len);
+
+    if (rcv_len < counter) {
+      counter -= rcv_len;
+      std::cout << buffer;
+    }
+    else if (rcv_len == counter) {
+      counter -= rcv_len;
+      readMeta(sock, buffer);
+    }
+    else {
+      std::cout << buffer.substr(0, counter);
+      buffer.erase()
+    }
+    std::cout << buffer;
+  }
+}
+
+void handleResponse(int &sock) {
+  std::string buffer = "";
+  std::string header = handleHeader(sock, buffer);
+
+  std::string status = getStatus(header);
+  if (!okStatus(status)) {
+    error("Bad status");
+  }
+
+  int metaIntVal = -1;
+  if (containsMeta(header)) {
+    metaIntVal = getMetaInt(header);
+  }
+
+  if (metaIntVal == -1) {
+    readDataWithoutMeta(sock, buffer);
+  }
+  else {
+    readDataWithMeta(sock, buffer, block_size);
   }
 }
 
@@ -222,7 +277,7 @@ int main(int argc, char** argv) {
   setConnection(sock, host, port, &addr_hints, &addr_result);
   freeaddrinfo(addr_result);
 
-  std::string message = setRequest(host, resource);
+  std::string message = setRequest(host, resource, meta);
   sendRequest(sock, message);
 
   handleResponse(sock);
