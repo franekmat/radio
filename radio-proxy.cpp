@@ -53,6 +53,9 @@ void checkMeta (std::string meta) {
 void checkTimeout (std::string timeout) {
   try {
     int timeout_value = std::stoi(timeout);
+    if (timeout_value <= 0) {
+      error("Timeout value shall be bigger than 0");
+    }
   }
   catch (std::invalid_argument const &e) {
 		error("Bad input: std::invalid_argument thrown");
