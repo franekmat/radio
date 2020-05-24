@@ -34,8 +34,19 @@ void checkMulti (std::string multi) {
   //check if proper value
 }
 
-/* I use std:stoi so for example "123abcdefg" is a proper integer, equal to "123" */
+bool containsOnlyDigits (std::string s) {
+  for (int i = 0; i < s.size(); i++) {
+    if (s[i] < '0' || s[i] > '9') {
+      return false;
+    }
+  }
+  return true;
+}
+
 void checkPort (std::string port) {
+  if (!containsOnlyDigits(port)) {
+    error("Invalid port number");
+  }
   try {
     int port_value = std::stoi(port);
   }
@@ -53,8 +64,10 @@ void checkMeta (std::string meta) {
   }
 }
 
-/* I use std:stoi so for example "123abcdefg" is a proper integer, equal to "123" */
 void checkTimeout (std::string timeout) {
+  if (!containsOnlyDigits(timeout)) {
+    error("Invalid timeout number");
+  }
   try {
     int timeout_value = std::stoi(timeout);
     if (timeout_value <= 0) {
@@ -202,8 +215,10 @@ int getMetaInt (std::string header) {
   header.erase(0, found + strlen("icy-metaint:"));
   std::string value = header.substr(0, header.find("\r\n"));
   int ret_value;
+  if (!containsOnlyDigits(value)) {
+    error("Invalid metaint number");
+  }
   try {
-    /* I use std:stoi so for example "123abcdefg" is a proper integer, equal to "123" */
     ret_value = std::stoi(value);
   }
   catch (std::invalid_argument const &e) {
