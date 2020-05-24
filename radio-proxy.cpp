@@ -157,13 +157,10 @@ std::string setRequest (std::string host, std::string resource, std::string meta
                    "Host: " + host + "\r\n" +
                    "User-Agent: Orban/Coding Technologies AAC/aacPlus Plugin 1.0 (os=Windows NT 5.1 Service Pack 2)\r\n" +
                    "Accept: */*\r\n";
-
   if (meta == "yes") {
     message += "Icy-MetaData: 1\r\n";
   }
-
   message += "Connection: close\r\n\r\n";
-
   return message;
 }
 
@@ -175,18 +172,18 @@ void setConnection(int &sock, std::string &host, int &port, struct addrinfo *add
 
   int err = getaddrinfo(host.c_str(), std::to_string(port).c_str(), addr_hints, addr_result);
   if (err == EAI_SYSTEM) {
-    printf("getaddrinfo: %s", gai_strerror(err));
+    error("getaddrinfo: " + std::string(gai_strerror(err)));
   }
   else if (err != 0) {
-    printf("getaddrinfo: %s", gai_strerror(err));
+    error("getaddrinfo: " + std::string(gai_strerror(err)));
   }
 
   sock = socket((*addr_result)->ai_family, (*addr_result)->ai_socktype, (*addr_result)->ai_protocol);
   if (sock < 0) {
-    printf("socket");
+    error("socket");
   }
   if (connect(sock, (*addr_result)->ai_addr, (*addr_result)->ai_addrlen) < 0) {
-    printf("connect");
+    error("connect");
   }
 }
 
