@@ -13,7 +13,7 @@
 
 #define DEFAULT_TIMEOUT 5
 #define DEFAULT_META "no"
-#define BUFFER_SIZE 1000005
+#define BUFFER_SIZE 10005
 
 void error(std::string err_msg)
 {
@@ -201,7 +201,7 @@ std::string handleHeader(int &sock, std::string &buffer) {
   return header;
 }
 
-void readDataWithoutMeta(int &sock, string &buffer) {
+void readDataWithoutMeta(int &sock, std::string &buffer) {
   std::cout << buffer;
   buffer.resize(BUFFER_SIZE);
   ssize_t rcv_len = 1;
@@ -216,32 +216,66 @@ void readDataWithoutMeta(int &sock, string &buffer) {
   }
 }
 
-void readDataWithMeta(int &sock, string &buffer, int size) {
-  int counter = size;
-  std::cout << buffer;
-  buffer.resize(BUFFER_SIZE);
-  ssize_t rcv_len = 1;
-  while (rcv_len > 0) {
-    buffer.resize(BUFFER_SIZE);
-    rcv_len = read(sock, &buffer[0], BUFFER_SIZE - 1);
-    if (rcv_len < 0) {
-      error("read");
-    }
-    buffer.resize(rcv_len);
+/* I know that buffer is not empty */
+void readMeta (int &sock, std::string &buffer) {
+  int size = (int)buffer[0] * 16;
+  // std::cerr << "usuwam 1 (" << size / 16 << ")\n";
+  buffer.erase(0, 1);
 
-    if (rcv_len < counter) {
-      counter -= rcv_len;
-      std::cout << buffer;
+  if (buffer.size() < size) {
+    std::string tmp = "";
+    ssize_t rcv_len = 1;
+    while (rcv_len > 0) {
+      tmp.resize(BUFFER_SIZE);
+      rcv_len = read(sock, &tmp[0], BUFFER_SIZE - 1);
+      if (rcv_len < 0) {
+        error("read");
+      }
+      tmp.resize(rcv_len);
+      buffer += tmp;
+
+      if (buffer.size() >= size) {
+        break;
+      }
     }
-    else if (rcv_len == counter) {
-      counter -= rcv_len;
-      readMeta(sock, buffer);
+  }
+
+  if (size > 0) {
+    // std::cerr << "usuwam " << size << "\n";
+    std::cerr << buffer.substr(0, size) << "\n";
+    buffer.erase(0, size);
+  }
+}
+
+void readDataWithMeta(int &sock, std::string &buffer, int size) {
+  int counter = size;
+  std::string tmp = "";
+  ssize_t rcv_len = 1;
+  while (rcv_len > 0 || !buffer.empty()) {
+    // i do not have yet buffer filled with data
+    if (buffer.size() < counter || counter == 0) {
+      tmp.resize(BUFFER_SIZE);
+      rcv_len = read(sock, &tmp[0], BUFFER_SIZE - 1);
+      if (rcv_len < 0) {
+        error("read");
+      }
+      tmp.resize(rcv_len);
+      buffer += tmp;
+    }
+
+    if (buffer.size() <= counter) {
+      counter -= buffer.size();
+      // std::cerr << buffer.size() << "<\n";
+      std::cout << buffer;
+      buffer = "";
     }
     else {
+      // std::cerr << counter << "\n";
       std::cout << buffer.substr(0, counter);
-      buffer.erase()
+      buffer.erase(0, counter);
+      readMeta(sock, buffer);
+      counter = size;
     }
-    std::cout << buffer;
   }
 }
 
@@ -263,7 +297,7 @@ void handleResponse(int &sock) {
     readDataWithoutMeta(sock, buffer);
   }
   else {
-    readDataWithMeta(sock, buffer, block_size);
+    readDataWithMeta(sock, buffer, metaIntVal);
   }
 }
 
