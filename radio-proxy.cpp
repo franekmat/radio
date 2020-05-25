@@ -35,7 +35,7 @@ void checkMulti (std::string multi) {
   //check if proper value
 }
 
-bool properNumberCheck (std::string s) {
+bool containsOnlyDigits (std::string s) {
   for (int i = 0; i < s.size(); i++) {
     if (s[i] < '0' || s[i] > '9') {
       return false;
@@ -44,7 +44,11 @@ bool properNumberCheck (std::string s) {
   return true;
 }
 
-int getValueFromString (std::string value) {
+int getValueFromString (std::string value, std::string whatsthat) {
+  if (!containsOnlyDigits(value)) {
+    std::string err_msg = "Invalid " + whatsthat + " number";
+    error(err_msg);
+  }
   int ret_val;
   try {
     ret_val = std::stoi(value);
@@ -59,7 +63,7 @@ int getValueFromString (std::string value) {
 }
 
 void checkPort (std::string port) {
-  if (!properNumberCheck(port)) {
+  if (0) {
     error("Invalid port number");
   }
 }
@@ -71,7 +75,7 @@ void checkMeta (std::string meta) {
 }
 
 void checkTimeout (std::string timeout) {
-  if (!properNumberCheck(timeout)) {
+  if (0) {
     error("Invalid timeout number");
   }
 }
@@ -106,7 +110,7 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
       case 'p' :
         checkPort(optarg);
         port_inp = true;
-        port = getValueFromString(optarg);
+        port = getValueFromString(optarg, "port");
         break;
       case 'm' :
         checkMeta(optarg);
@@ -114,7 +118,7 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
         break;
       case 't' :
         checkTimeout(optarg);
-        timeout = getValueFromString(optarg);
+        timeout = getValueFromString(optarg, "timeout");
         if (timeout <= 0) {
           error("Timeout value shall be bigger than 0");
         }
@@ -122,7 +126,7 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
       case 'P' :
         checkPort(optarg);
         port_client_inp = true;
-        port_client = getValueFromString(optarg);
+        port_client = getValueFromString(optarg, "port");
         break;
       case 'B' :
         checkMulti(optarg);
@@ -130,7 +134,7 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
         break;
       case 'T' :
         checkTimeout(optarg); //not sure if rules are the same as in -t case
-        timeout_client = getValueFromString(optarg);
+        timeout_client = getValueFromString(optarg, "timeout");
         if (timeout_client <= 0) { //tu też?
           error("Timeout value shall be bigger than 0");
         }
@@ -202,20 +206,7 @@ int getMetaInt (std::string header) {
   header.erase(0, found + strlen("icy-metaint:"));
   std::string value = header.substr(0, header.find("\r\n"));
   int ret_value;
-  if (!properNumberCheck(value)) {
-    error("Invalid metaint number");
-  }
-  ret_value = getValueFromString(value);
-  try {
-    ret_value = std::stoi(value);
-  }
-  catch (std::invalid_argument const &e) {
-		error("Bad input: std::invalid_argument thrown");
-	}
-	catch (std::out_of_range const &e) {
-		error("Integer overflow: std::out_of_range thrown");
-	}
-  return ret_value;
+  return getValueFromString(value, "metaint");
 }
 
 bool containsEndOfHeader(std::string &buffer) {
