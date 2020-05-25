@@ -160,6 +160,14 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
   }
 }
 
+void printData (std::string data) {
+  std::cout << data;
+}
+
+void printMeta (std::string meta) {
+  std::cerr << meta << "\n";
+}
+
 std::string setRequest (std::string host, std::string resource, std::string meta) {
   std::string message =
                    "GET " + resource + " HTTP/1.0\r\n" +
@@ -294,12 +302,12 @@ std::string handleHeader(int &sock, std::string &buffer, int timeout) {
 }
 
 void readDataWithoutMeta(int &sock, std::string &buffer, int timeout) {
-  std::cout << buffer;
+  printData(buffer);
   ssize_t rcv_len = 1;
 
   while (rcv_len > 0) {
     rcv_len = readTCP(sock, buffer, timeout);
-    std::cout << buffer;
+    printData(buffer);
   }
 }
 
@@ -337,7 +345,7 @@ void readMeta (int &sock, std::string &buffer, int timeout) {
   }
 
   // std::cerr << "usuwam " << size << "\n";
-  std::cerr << buffer.substr(0, size) << "\n";
+  printMeta(buffer.substr(0, size));
   buffer.erase(0, size);
 }
 
@@ -356,12 +364,12 @@ void readDataWithMeta(int &sock, std::string &buffer, int size, int timeout) {
     if (buffer.size() <= counter) {
       counter -= buffer.size();
       // std::cerr << buffer.size() << "<\n";
-      std::cout << buffer;
+      printData(buffer);
       buffer = "";
     }
     else {
       // std::cerr << counter << "\n";
-      std::cout << buffer.substr(0, counter);
+      printData(buffer.substr(0, counter));
       buffer.erase(0, counter);
       readMeta(sock, buffer, timeout);
       counter = size;
