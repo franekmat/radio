@@ -35,7 +35,7 @@ void checkMulti (std::string multi) {
   //check if proper value
 }
 
-bool containsOnlyDigits (std::string s) {
+bool properNumberCheck (std::string s) {
   for (int i = 0; i < s.size(); i++) {
     if (s[i] < '0' || s[i] > '9') {
       return false;
@@ -44,12 +44,10 @@ bool containsOnlyDigits (std::string s) {
   return true;
 }
 
-void checkPort (std::string port) {
-  if (!containsOnlyDigits(port)) {
-    error("Invalid port number");
-  }
+int getValueFromString (std::string value) {
+  int ret_val;
   try {
-    int port_value = std::stoi(port);
+    ret_val = std::stoi(value);
   }
   catch (std::invalid_argument const &e) {
 		error("Bad input: std::invalid_argument thrown");
@@ -57,6 +55,13 @@ void checkPort (std::string port) {
 	catch (std::out_of_range const &e) {
 		error("Integer overflow: std::out_of_range thrown");
 	}
+  return ret_val;
+}
+
+void checkPort (std::string port) {
+  if (!properNumberCheck(port)) {
+    error("Invalid port number");
+  }
 }
 
 void checkMeta (std::string meta) {
@@ -66,21 +71,9 @@ void checkMeta (std::string meta) {
 }
 
 void checkTimeout (std::string timeout) {
-  if (!containsOnlyDigits(timeout)) {
+  if (!properNumberCheck(timeout)) {
     error("Invalid timeout number");
   }
-  try {
-    int timeout_value = std::stoi(timeout);
-    if (timeout_value <= 0) {
-      error("Timeout value shall be bigger than 0");
-    }
-  }
-  catch (std::invalid_argument const &e) {
-		error("Bad input: std::invalid_argument thrown");
-	}
-	catch (std::out_of_range const &e) {
-		error("Integer overflow: std::out_of_range thrown");
-	}
 }
 
 void printUsageError(std::string name) {
@@ -113,8 +106,7 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
       case 'p' :
         checkPort(optarg);
         port_inp = true;
-        /*  I checked if port is a proper integer so no need to check it again */
-        port = std::stoi(optarg);
+        port = getValueFromString(optarg);
         break;
       case 'm' :
         checkMeta(optarg);
@@ -122,14 +114,15 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
         break;
       case 't' :
         checkTimeout(optarg);
-        /*  I checked if tiemout is a proper integer so no need to check it again */
-        timeout = std::stoi(optarg);
+        timeout = getValueFromString(optarg);
+        if (timeout <= 0) {
+          error("Timeout value shall be bigger than 0");
+        }
         break;
       case 'P' :
         checkPort(optarg);
         port_client_inp = true;
-        /*  I checked if port is a proper integer so no need to check it again */
-        port_client = std::stoi(optarg);
+        port_client = getValueFromString(optarg);
         break;
       case 'B' :
         checkMulti(optarg);
@@ -137,8 +130,10 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
         break;
       case 'T' :
         checkTimeout(optarg); //not sure if rules are the same as in -t case
-        /*  I checked if tiemout is a proper integer so no need to check it again */
-        timeout_client = std::stoi(optarg);
+        timeout_client = getValueFromString(optarg);
+        if (timeout_client <= 0) { //tu też?
+          error("Timeout value shall be bigger than 0");
+        }
         break;
       case '?' :
         printUsageError(argv[0]);
@@ -207,9 +202,10 @@ int getMetaInt (std::string header) {
   header.erase(0, found + strlen("icy-metaint:"));
   std::string value = header.substr(0, header.find("\r\n"));
   int ret_value;
-  if (!containsOnlyDigits(value)) {
+  if (!properNumberCheck(value)) {
     error("Invalid metaint number");
   }
+  ret_value = getValueFromString(value);
   try {
     ret_value = std::stoi(value);
   }
@@ -286,11 +282,25 @@ void readDataWithoutMeta(int &sock, std::string &buffer, int timeout) {
   }
 }
 
+
+int getMetaSize(std::string &buffer) {
+  if (buffer.empty()) {
+    error("Cannot get size of meta from empty buffer");
+  }
+  return (int)buffer[0] * 16;
+}
+
 /* I know that buffer is not empty */
 void readMeta (int &sock, std::string &buffer, int timeout) {
-  int size = (int)buffer[0] * 16;
-  // std::cerr << "usuwam 1 (" << size / 16 << ")\n";
+  int size = getMetaSize(buffer);
   buffer.erase(0, 1);
+
+  if (size < 0) {
+    error("wrong size of meta data");
+  }
+  else if (size == 0) {
+    return;
+  }
 
   if (buffer.size() < size) {
     std::string tmp = "";
@@ -305,17 +315,14 @@ void readMeta (int &sock, std::string &buffer, int timeout) {
     }
   }
 
-  if (size > 0) {
-    // std::cerr << "usuwam " << size << "\n";
-    std::cerr << buffer.substr(0, size) << "\n";
-    buffer.erase(0, size);
-  }
+  // std::cerr << "usuwam " << size << "\n";
+  std::cerr << buffer.substr(0, size) << "\n";
+  buffer.erase(0, size);
 }
 
 void readDataWithMeta(int &sock, std::string &buffer, int size, int timeout) {
   int counter = size;
   std::string tmp = "";
-  struct pollfd fds[1] = {{sock, 0 | POLLIN}};
   ssize_t rcv_len = 1;
 
   while (rcv_len > 0 || !buffer.empty()) {
