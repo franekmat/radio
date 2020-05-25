@@ -395,5 +395,7 @@ int main(int argc, char** argv) {
   sendRequest(sock, message);
   handleResponse(sock, meta, timeout);
 
+  (void) close(sock);
+
   return 0;
 }
