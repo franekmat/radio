@@ -327,7 +327,7 @@ void readDataWithMeta(int &sock, std::string &buffer, int size, int timeout) {
   while (rcv_len > 0 || !buffer.empty()) {
     // i do not have yet buffer filled with data
     if (buffer.size() < counter || counter == 0) {
-      readTCP(sock, tmp, timeout);
+      rcv_len = readTCP(sock, tmp, timeout);
       buffer += tmp;
     }
 
