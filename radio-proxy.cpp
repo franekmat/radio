@@ -36,7 +36,16 @@ void checkMulti (std::string multi) {
 }
 
 bool containsOnlyDigits (std::string s) {
-  for (int i = 0; i < s.size(); i++) {
+  /* I want to ignore leading and trailing spaces */
+  int l = 0, p = s.size() - 1;
+  while (l < s.size() && s[l] == ' ') {
+    l++;
+  }
+  while (p >= 0 && s[p] == ' ') {
+    p--;
+  }
+  /* now check if number contains something other than digit characters */
+  for (int i = l; i <= p; i++) {
     if (s[i] < '0' || s[i] > '9') {
       return false;
     }
@@ -205,7 +214,6 @@ int getMetaInt (std::string header) {
   std::size_t found = header.find("icy-metaint:");
   header.erase(0, found + strlen("icy-metaint:"));
   std::string value = header.substr(0, header.find("\r\n"));
-  int ret_value;
   return getValueFromString(value, "metaint");
 }
 
