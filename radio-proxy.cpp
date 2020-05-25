@@ -98,7 +98,7 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
     printUsageError(argv[0]);
   }
 
-  while ((opt = getopt(argc, argv, "h:r:p:m:t:")) != EOF) {
+  while ((opt = getopt(argc, argv, "h:r:p:m:t:P:B:T:")) != EOF) {
     switch(opt) {
       case 'h' :
         checkHostName(optarg);
