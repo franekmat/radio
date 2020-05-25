@@ -95,7 +95,7 @@ void printUsageError(std::string name) {
 }
 
 void parseInput(int argc, char **argv, std::string &host, std::string &resource,
-  int &port, std::string &meta, int &timeout, int &port_client, int &timeout_client, std::string &multi) {
+  int &port, std::string &meta, int &timeout, int &port_client, int &timeout_clients, std::string &multi) {
   int opt;
   bool host_inp = false, resource_inp = false, port_inp = false;
   bool port_client_inp = false;
@@ -143,8 +143,8 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
         break;
       case 'T' :
         checkTimeout(optarg); //not sure if rules are the same as in -t case
-        timeout_client = getValueFromString(optarg, "timeout");
-        if (timeout_client <= 0) { //tu też?
+        timeout_clients = getValueFromString(optarg, "timeout");
+        if (timeout_clients <= 0) { //tu też?
           error("Timeout value shall be bigger than 0");
         }
         break;
@@ -173,7 +173,7 @@ std::string setRequest (std::string host, std::string resource, std::string meta
   return message;
 }
 
-void SetTcpConnection(int &sock, std::string &host, int &port) {
+void setTcpConnection(int &sock, std::string &host, int &port) {
   struct addrinfo addr_hints, *addr_result = NULL;
   memset(&addr_hints, 0, sizeof(struct addrinfo));
   addr_hints.ai_family = AF_INET;
@@ -200,8 +200,23 @@ void SetTcpConnection(int &sock, std::string &host, int &port) {
   freeaddrinfo(addr_result);
 }
 
-void setUdpConnection(int &sock, int &port, struct sockaddr_in &server_address, struct sockaddr_in &client_address) {
+void setUdpConnection(int &sock, int &port, int timeout) {
+  struct sockaddr_in server_address;
+	struct sockaddr_in client_address;
 
+  sock = socket(AF_INET, SOCK_DGRAM, 0); // creating IPv4 UDP socket
+	if (sock < 0) {
+    error ("socket");
+  }
+
+  server_address.sin_family = AF_INET; // IPv4
+	server_address.sin_addr.s_addr = htonl(INADDR_ANY); // listening on all interfaces
+	server_address.sin_port = htons(port); // default port for receiving is PORT_NUM
+
+  // bind the socket to a concrete address
+	if (bind(sock, (struct sockaddr *) &server_address, (socklen_t) sizeof(server_address)) < 0) {
+    error("bind");
+  }
 }
 
 void sendRequest(int &sock, std::string &message) {
@@ -386,11 +401,13 @@ int main(int argc, char** argv) {
   int port = -1, timeout = DEFAULT_TIMEOUT, sock;
   std::string host = "", resource = "", meta = DEFAULT_META;
   /* for B part of the task */
-  int port_client = -1, timeout_client = DEFAULT_TIMEOUT;
+  int port_client = -1, timeout_clients = DEFAULT_TIMEOUT, sock_udp;
   std::string multi = "";
 
-  parseInput(argc, argv, host, resource, port, meta, timeout, port_client, timeout_client, multi);
-  SetTcpConnection(sock, host, port);
+  parseInput(argc, argv, host, resource, port, meta, timeout, port_client, timeout_clients, multi);
+  setTcpConnection(sock, host, port);
+  setUdpConnection(sock_udp, port_client, timeout_clients);
+
   std::string message = setRequest(host, resource, meta);
   sendRequest(sock, message);
   handleResponse(sock, meta, timeout);
