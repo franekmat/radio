@@ -173,13 +173,14 @@ std::string setRequest (std::string host, std::string resource, std::string meta
   return message;
 }
 
-void setConnection(int &sock, std::string &host, int &port, struct addrinfo *addr_hints, struct addrinfo **addr_result) {
-  memset(addr_hints, 0, sizeof(struct addrinfo));
-  addr_hints->ai_family = AF_INET;
-  addr_hints->ai_socktype = SOCK_STREAM;
-  addr_hints->ai_protocol = IPPROTO_TCP;
+void SetTcpConnection(int &sock, std::string &host, int &port) {
+  struct addrinfo addr_hints, *addr_result = NULL;
+  memset(&addr_hints, 0, sizeof(struct addrinfo));
+  addr_hints.ai_family = AF_INET;
+  addr_hints.ai_socktype = SOCK_STREAM;
+  addr_hints.ai_protocol = IPPROTO_TCP;
 
-  int err = getaddrinfo(host.c_str(), std::to_string(port).c_str(), addr_hints, addr_result);
+  int err = getaddrinfo(host.c_str(), std::to_string(port).c_str(), &addr_hints, &addr_result);
   if (err == EAI_SYSTEM) {
     error("getaddrinfo: " + std::string(gai_strerror(err)));
   }
@@ -187,14 +188,20 @@ void setConnection(int &sock, std::string &host, int &port, struct addrinfo *add
     error("getaddrinfo: " + std::string(gai_strerror(err)));
   }
 
-  sock = socket((*addr_result)->ai_family, (*addr_result)->ai_socktype, (*addr_result)->ai_protocol);
+  sock = socket(addr_result->ai_family, addr_result->ai_socktype, addr_result->ai_protocol);
   if (sock < 0) {
     error("socket");
   }
 
-  if (connect(sock, (*addr_result)->ai_addr, (*addr_result)->ai_addrlen) < 0) {
+  if (connect(sock, addr_result->ai_addr, addr_result->ai_addrlen) < 0) {
     error("connect");
   }
+
+  freeaddrinfo(addr_result);
+}
+
+void setUdpConnection(int &sock, int &port, struct sockaddr_in &server_address, struct sockaddr_in &client_address) {
+
 }
 
 void sendRequest(int &sock, std::string &message) {
@@ -375,20 +382,17 @@ void handleResponse(int &sock, std::string &meta, int timeout) {
 }
 
 int main(int argc, char** argv) {
+  /* for A part of the task */
   int port = -1, timeout = DEFAULT_TIMEOUT, sock;
   std::string host = "", resource = "", meta = DEFAULT_META;
-  struct addrinfo addr_hints, *addr_result = NULL;
+  /* for B part of the task */
   int port_client = -1, timeout_client = DEFAULT_TIMEOUT;
   std::string multi = "";
 
   parseInput(argc, argv, host, resource, port, meta, timeout, port_client, timeout_client, multi);
-
-  setConnection(sock, host, port, &addr_hints, &addr_result);
-  freeaddrinfo(addr_result);
-
+  SetTcpConnection(sock, host, port);
   std::string message = setRequest(host, resource, meta);
   sendRequest(sock, message);
-
   handleResponse(sock, meta, timeout);
 
   return 0;
