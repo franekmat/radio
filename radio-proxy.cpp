@@ -95,10 +95,10 @@ void printUsageError(std::string name) {
 }
 
 void parseInput(int argc, char **argv, std::string &host, std::string &resource,
-  int &port, std::string &meta, int &timeout, int &port_client, int &timeout_clients, std::string &multi) {
+  int &port, std::string &meta, int &timeout, int &port_clients, int &timeout_clients, std::string &multi) {
   int opt;
   bool host_inp = false, resource_inp = false, port_inp = false;
-  bool port_client_inp = false;
+  bool port_clients_inp = false;
 
   if (argc < 3) {
     printUsageError(argv[0]);
@@ -134,8 +134,8 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
         break;
       case 'P' :
         checkPort(optarg);
-        port_client_inp = true;
-        port_client = getValueFromString(optarg, "port");
+        port_clients_inp = true;
+        port_clients = getValueFromString(optarg, "port");
         break;
       case 'B' :
         checkMulti(optarg);
@@ -155,7 +155,7 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
     }
   }
 
-  if (!host_inp || !resource_inp || !port_inp) { //dodać port_client_inp
+  if (!host_inp || !resource_inp || !port_inp) { //dodać port_clients_inp
     printUsageError(argv[0]);
   }
 }
@@ -401,12 +401,12 @@ int main(int argc, char** argv) {
   int port = -1, timeout = DEFAULT_TIMEOUT, sock;
   std::string host = "", resource = "", meta = DEFAULT_META;
   /* for B part of the task */
-  int port_client = -1, timeout_clients = DEFAULT_TIMEOUT, sock_udp;
+  int port_clients = -1, timeout_clients = DEFAULT_TIMEOUT, sock_udp;
   std::string multi = "";
 
-  parseInput(argc, argv, host, resource, port, meta, timeout, port_client, timeout_clients, multi);
+  parseInput(argc, argv, host, resource, port, meta, timeout, port_clients, timeout_clients, multi);
   setTcpConnection(sock, host, port);
-  setUdpConnection(sock_udp, port_client, timeout_clients);
+  setUdpConnection(sock_udp, port_clients, timeout_clients);
 
   std::string message = setRequest(host, resource, meta);
   sendRequest(sock, message);
