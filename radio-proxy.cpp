@@ -15,6 +15,11 @@
 #define DEFAULT_TIMEOUT 5
 #define DEFAULT_META "no"
 #define BUFFER_SIZE 10005
+#define DISCOVER 1
+#define IAM 2
+#define KEEPALIVE 3
+#define AUDIO 4
+#define METADATA 6
 
 void error(std::string err_msg)
 {
@@ -166,6 +171,45 @@ void printData (std::string data) {
 
 void printMeta (std::string meta) {
   std::cerr << meta << "\n";
+}
+
+std::string getUdpHeader (std::string type, int length) {
+  std::string res = "";
+  int n;
+  if (type == "DISCOVER") {
+    n = 1;
+  }
+  else if (type == "IAM") {
+    n = 2;
+  }
+  else if (type == "KEEPALIVE") {
+    n = 3;
+  }
+  else if (type == "AUDIO") {
+    n = 4;
+  }
+  else if (type == "METADATA") {
+    n = 6;
+  }
+  res += (char)((n >> 8) & 0xFF);
+  res += (char)(n & 0xFF);
+  res += (char)((length >> 8) & 0xFF);
+  res += (char)(length & 0xFF);
+
+  return res;
+}
+
+std::string getUdpMessage(std::string type, int length, std::string data) {
+  std::string message = "";
+  if (type == "IAM") {
+    message += (getUdpHeader(type, length) + data);
+  }
+
+  return message;
+}
+
+void sendUdpMessage(int &sock, std::string message) {
+
 }
 
 std::string setRequest (std::string host, std::string resource, std::string meta) {
