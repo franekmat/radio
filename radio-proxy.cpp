@@ -165,13 +165,6 @@ std::string setRequest (std::string host, std::string resource, std::string meta
   return message;
 }
 
-// void setTimeout(int &sock, int time) {
-//   struct timeval timeout;
-//   timeout.tv_sec = time;
-// 	timeout.tv_usec = 0;
-//   setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&timeout, sizeof timeout);
-// }
-
 void setConnection(int &sock, std::string &host, int &port, struct addrinfo *addr_hints, struct addrinfo **addr_result) {
   memset(addr_hints, 0, sizeof(struct addrinfo));
   addr_hints->ai_family = AF_INET;
@@ -250,24 +243,31 @@ std::string getHeader(std::string &buffer) {
   return header;
 }
 
+/* read and return rcv_len */
+ssize_t readTCP(int &sock, std::string &tmp, int timeout) {
+  ssize_t rcv_len;
+  struct pollfd fds[1] = {{sock, 0 | POLLIN}};
+
+  tmp.resize(BUFFER_SIZE);
+  if (poll(fds, 1, timeout * 1000) == 0) {
+    error("Read timeout");
+  }
+  rcv_len = read(sock, &tmp[0], BUFFER_SIZE - 1);
+  if (rcv_len < 0) {
+    error("read");
+  }
+  tmp.resize(rcv_len);
+  return rcv_len;
+}
+
 /* receive header and return response status */
 std::string handleHeader(int &sock, std::string &buffer, int timeout) {
   std::string tmp = "";
   ssize_t rcv_len = 1;
-  struct pollfd fds[1] = {{sock, 0 | POLLIN}};
 
   while (rcv_len > 0) {
-    tmp.resize(BUFFER_SIZE);
-    if (poll(fds, 1, timeout * 1000) == 0) {
-      error("Read timeout");
-    }
-    rcv_len = read(sock, &tmp[0], BUFFER_SIZE - 1);
-    if (rcv_len < 0) {
-      error("read");
-    }
-    tmp.resize(rcv_len);
+    rcv_len = readTCP(sock, tmp, timeout);
     buffer += tmp;
-
     if (containsEndOfHeader(buffer)) {
       break;
     }
@@ -278,20 +278,10 @@ std::string handleHeader(int &sock, std::string &buffer, int timeout) {
 
 void readDataWithoutMeta(int &sock, std::string &buffer, int timeout) {
   std::cout << buffer;
-  buffer.resize(BUFFER_SIZE);
-  struct pollfd fds[1] = {{sock, 0 | POLLIN}};
   ssize_t rcv_len = 1;
 
   while (rcv_len > 0) {
-    buffer.resize(BUFFER_SIZE);
-    if (poll(fds, 1, timeout * 1000) == 0) {
-      error("Read timeout");
-    }
-    rcv_len = read(sock, &buffer[0], BUFFER_SIZE - 1);
-    if (rcv_len < 0) {
-      error("read");
-    }
-    buffer.resize(rcv_len);
+    rcv_len = readTCP(sock, buffer, timeout);
     std::cout << buffer;
   }
 }
@@ -304,21 +294,11 @@ void readMeta (int &sock, std::string &buffer, int timeout) {
 
   if (buffer.size() < size) {
     std::string tmp = "";
-    struct pollfd fds[1] = {{sock, 0 | POLLIN}};
     ssize_t rcv_len = 1;
 
     while (rcv_len > 0) {
-      tmp.resize(BUFFER_SIZE);
-      if (poll(fds, 1, timeout * 1000) == 0) {
-        error("Read timeout");
-      }
-      rcv_len = read(sock, &tmp[0], BUFFER_SIZE - 1);
-      if (rcv_len < 0) {
-        error("read");
-      }
-      tmp.resize(rcv_len);
+      rcv_len = readTCP(sock, tmp, timeout);
       buffer += tmp;
-
       if (buffer.size() >= size) {
         break;
       }
@@ -341,15 +321,7 @@ void readDataWithMeta(int &sock, std::string &buffer, int size, int timeout) {
   while (rcv_len > 0 || !buffer.empty()) {
     // i do not have yet buffer filled with data
     if (buffer.size() < counter || counter == 0) {
-      tmp.resize(BUFFER_SIZE);
-      if (poll(fds, 1, timeout * 1000) == 0) {
-        error("Read timeout");
-      }
-      rcv_len = read(sock, &tmp[0], BUFFER_SIZE - 1);
-      if (rcv_len < 0) {
-        error("read");
-      }
-      tmp.resize(rcv_len);
+      readTCP(sock, tmp, timeout);
       buffer += tmp;
     }
 
