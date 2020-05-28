@@ -25,6 +25,8 @@
 #define AUDIO 4
 #define METADATA 6
 
+typedef std::deque <std::pair<struct sockaddr_in, unsigned long long> > ClientsDeque;
+
 void error(std::string err_msg)
 {
   const char *err_message = err_msg.c_str();
@@ -175,10 +177,7 @@ unsigned long long gettimelocal() {
    return ((unsigned long long)t.tv_sec * 1000000) + t.tv_usec;
 }
 
-std::deque <std::pair<struct sockaddr_in, unsigned long long> > clients;
-
-
-void deleteClient(struct sockaddr_in &client) {
+void deleteClient(struct sockaddr_in &client, ClientsDeque &clients) {
   for (int i = 0; i < clients.size(); i++) {
     if (clients[i].first.sin_addr.s_addr == client.sin_addr.s_addr &&
         clients[i].first.sin_port == client.sin_port) {
@@ -188,7 +187,7 @@ void deleteClient(struct sockaddr_in &client) {
   }
 }
 
-void updateClients(int &sock_udp) {
+void updateClients(int &sock_udp, ClientsDeque &clients) {
   struct sockaddr_in client_address;
   struct hostent *hostp;
   char *hostaddrp;
@@ -207,7 +206,7 @@ void updateClients(int &sock_udp) {
     if (len < 0) {
       error("error on datagram from client socket");
     }
-    deleteClient(client_address);
+    deleteClient(client_address, clients);
     clients.push_back(std::make_pair(client_address, gettimelocal()));
   }
 }
@@ -246,7 +245,7 @@ std::string getUdpMessage(std::string type, int length, std::string data) {
   return data;
 }
 
-void sendUdpMessage(int &sock_udp, std::string message) {
+void sendUdpMessage(int &sock_udp, std::string message, ClientsDeque &clients) {
   unsigned long long current_time = gettimelocal();
   ssize_t snd_len, len = message.size();
   socklen_t snda_len;
@@ -254,7 +253,7 @@ void sendUdpMessage(int &sock_udp, std::string message) {
   for (auto client : clients) {
     snda_len = (socklen_t) sizeof(client_address);
     if (current_time - client.second < 5000000) {
-      // std::cout << "sending to " << client.first.sin_port << "\n";
+      std::cout << "sending to " << client.first.sin_port << "\n";
       client_address = client.first;
       snd_len = sendto(sock_udp, message.c_str(), message.size(), 0, (struct sockaddr *) &client_address, snda_len);
       if (snd_len != len) {
@@ -264,17 +263,17 @@ void sendUdpMessage(int &sock_udp, std::string message) {
   }
 }
 
-void printData (std::string data, int &sock_udp) {
+void printData (std::string data, int &sock_udp, ClientsDeque &clients) {
   if (data.empty()) {
     return;
   }
-  updateClients(sock_udp);
+  updateClients(sock_udp, clients);
   std::string message = getUdpMessage("AUDIO", (int)data.size(), data);
-  sendUdpMessage(sock_udp, message);
+  sendUdpMessage(sock_udp, message, clients);
   // std::cout << message;
 }
 
-void printMeta (std::string meta, int &sock_udp) {
+void printMeta (std::string meta, int &sock_udp, ClientsDeque &clients) {
   // if (meta.empty()) {
   //   return;
   // }
@@ -429,13 +428,13 @@ std::string handleHeader(int &sock, std::string &buffer, int timeout) {
   return getHeader(buffer);
 }
 
-void readDataWithoutMeta(int &sock, int &sock_udp, std::string &buffer, int timeout) {
-  printData(buffer, sock_udp);
+void readDataWithoutMeta(int &sock, int &sock_udp, std::string &buffer, int timeout, ClientsDeque &clients) {
+  printData(buffer, sock_udp, clients);
   ssize_t rcv_len = 1;
 
   while (rcv_len > 0) {
     rcv_len = readTCP(sock, buffer, timeout);
-    printData(buffer, sock_udp);
+    printData(buffer, sock_udp, clients);
   }
 }
 
@@ -448,7 +447,7 @@ int getMetaSize(std::string &buffer) {
 }
 
 /* I know that buffer is not empty */
-void readMeta (int &sock, int &sock_udp, std::string &buffer, int timeout) {
+void readMeta (int &sock, int &sock_udp, std::string &buffer, int timeout, ClientsDeque &clients) {
   int size = getMetaSize(buffer);
   buffer.erase(0, 1);
 
@@ -473,11 +472,11 @@ void readMeta (int &sock, int &sock_udp, std::string &buffer, int timeout) {
   }
 
   // std::cerr << "usuwam " << size << "\n";
-  printMeta(buffer.substr(0, size), sock_udp);
+  printMeta(buffer.substr(0, size), sock_udp, clients);
   buffer.erase(0, size);
 }
 
-void readDataWithMeta(int &sock, int &sock_udp, std::string &buffer, int size, int timeout) {
+void readDataWithMeta(int &sock, int &sock_udp, std::string &buffer, int size, int timeout, ClientsDeque &clients) {
   int counter = size;
   std::string tmp = "";
   ssize_t rcv_len = 1;
@@ -492,20 +491,20 @@ void readDataWithMeta(int &sock, int &sock_udp, std::string &buffer, int size, i
     if (buffer.size() <= counter) {
       counter -= buffer.size();
       // std::cerr << buffer.size() << "<\n";
-      printData(buffer, sock_udp);
+      printData(buffer, sock_udp, clients);
       buffer = "";
     }
     else {
       // std::cerr << counter << "\n";
-      printData(buffer.substr(0, counter), sock_udp);
+      printData(buffer.substr(0, counter), sock_udp, clients);
       buffer.erase(0, counter);
-      readMeta(sock, sock_udp, buffer, timeout);
+      readMeta(sock, sock_udp, buffer, timeout, clients);
       counter = size;
     }
   }
 }
 
-void handleResponse(int &sock, int &sock_udp, std::string &meta, int timeout) {
+void handleResponse(int &sock, int &sock_udp, std::string &meta, int timeout, ClientsDeque &clients) {
   std::string buffer = "";
   std::string header = handleHeader(sock, buffer, timeout);
 
@@ -522,13 +521,13 @@ void handleResponse(int &sock, int &sock_udp, std::string &meta, int timeout) {
   // std::cerr << "metaint = " << metaIntVal << "\n";
 
   if (metaIntVal == -1) {
-    readDataWithoutMeta(sock, sock_udp, buffer, timeout);
+    readDataWithoutMeta(sock, sock_udp, buffer, timeout, clients);
   }
   else {
     if (meta != "yes") {
       error("We did not ask server for meta data");
     }
-    readDataWithMeta(sock, sock_udp, buffer, metaIntVal, timeout);
+    readDataWithMeta(sock, sock_udp, buffer, metaIntVal, timeout, clients);
   }
 }
 
@@ -541,6 +540,7 @@ int main(int argc, char** argv) {
   /* for B part of the task */
   int port_clients = -1, timeout_clients = DEFAULT_TIMEOUT, sock_udp;
   std::string multi = "";
+  ClientsDeque clients;
 
   parseInput(argc, argv, host, resource, port, meta, timeout, port_clients, timeout_clients, multi);
   setTcpConnection(sock, host, port);
@@ -548,7 +548,7 @@ int main(int argc, char** argv) {
 
   std::string message = setRequest(host, resource, meta);
   sendRequest(sock, message);
-  handleResponse(sock, sock_udp, meta, timeout);
+  handleResponse(sock, sock_udp, meta, timeout, clients);
 
   (void) close(sock);
 
