@@ -119,12 +119,9 @@ void parseInput(int argc, char **argv, std::string &host, int &port_udp, int &po
   }
 }
 
-void setUdpConnection(int &sock, std::string host, int &port, int timeout) {
+void setUdpConnection(int &sock, std::string host, int &port, int timeout, struct sockaddr_in &my_address) {
   struct addrinfo addr_hints;
   struct addrinfo *addr_result;
-
-  struct sockaddr_in my_address;
-  struct sockaddr_in srvr_address;
 
   // 'converting' host/port in string to struct addrinfo
   (void) memset(&addr_hints, 0, sizeof(struct addrinfo));
@@ -150,47 +147,52 @@ void setUdpConnection(int &sock, std::string host, int &port, int timeout) {
   sock = socket(PF_INET, SOCK_DGRAM, 0);
   if (sock < 0)
     error("socket");
-
-
-  while(1) {
-  char buffer[BUFFER_SIZE];
-  socklen_t snda_len, rcva_len;
-	ssize_t len, snd_len, rcv_len;
-
-  std::string nth = "sdfdf";
-  len = nth.size();
-
-  rcva_len = (socklen_t) sizeof(my_address);
-  snd_len = sendto(sock, nth.c_str(), nth.size(), 0,
-      (struct sockaddr *) &my_address, rcva_len);
-  if (snd_len != (ssize_t) len) {
-    error("partial / failed write");
-  }
-
-  (void) memset(buffer, 0, sizeof(buffer));
-  len = (size_t) sizeof(buffer) - 1;
-  rcva_len = (socklen_t) sizeof(srvr_address);
-
-  std::string tmp;
-  tmp.resize(BUFFER_SIZE);
-  rcv_len = recvfrom(sock, &tmp[0], len, 0,
-      (struct sockaddr *) &srvr_address, &rcva_len);
-  if (rcv_len < 0) {
-    error("read");
-  }
-  tmp.resize(rcv_len);
-  std::cout << tmp;
 }
+
+void receiveUdpData (int &sock, struct sockaddr_in &my_address) {
+  while(1) {
+    char buffer[BUFFER_SIZE];
+    socklen_t snda_len, rcva_len;
+  	ssize_t len, snd_len, rcv_len;
+    struct sockaddr_in srvr_address;
+
+    std::string nth = "sdfdf";
+    len = nth.size();
+
+    rcva_len = (socklen_t) sizeof(my_address);
+    snd_len = sendto(sock, nth.c_str(), nth.size(), 0,
+        (struct sockaddr *) &my_address, rcva_len);
+    if (snd_len != (ssize_t) len) {
+      error("partial / failed write");
+    }
+
+    (void) memset(buffer, 0, sizeof(buffer));
+    len = (size_t) sizeof(buffer) - 1;
+    rcva_len = (socklen_t) sizeof(srvr_address);
+
+    std::string tmp;
+    tmp.resize(BUFFER_SIZE);
+    rcv_len = recvfrom(sock, &tmp[0], len, 0,
+        (struct sockaddr *) &srvr_address, &rcva_len);
+    if (rcv_len < 0) {
+      error("read");
+    }
+    tmp.resize(rcv_len);
+    std::cout << tmp;
+  }
 }
 
 int main(int argc, char** argv) {
   int port_udp = -1, port_tcp = -1, timeout = DEFAULT_TIMEOUT, sock;
   std::string host = "";
   struct addrinfo addr_hints, *addr_result = NULL;
+  struct sockaddr_in my_address;
 
   parseInput(argc, argv, host, port_udp, port_tcp, timeout);
 
-  setUdpConnection(sock, host, port_udp, 0);
+  setUdpConnection(sock, host, port_udp, 0, my_address);
+
+  receiveUdpData (sock, my_address);
 
   return 0;
 }
