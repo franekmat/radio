@@ -10,11 +10,15 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <poll.h>
+#include <deque>
+#include <sys/time.h>
+#include <arpa/inet.h>
+#include <stdexcept>
 #include "err.h"
 
 #define DEFAULT_TIMEOUT 5
 #define DEFAULT_META "no"
-#define BUFFER_SIZE 10005
+#define BUFFER_SIZE 5005
 #define DISCOVER 1
 #define IAM 2
 #define KEEPALIVE 3
@@ -165,12 +169,47 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
   }
 }
 
-void printData (std::string data) {
-  std::cout << data;
+unsigned long long gettimelocal() {
+   struct timeval t = {0,0};
+   gettimeofday(&t,NULL);
+   return ((unsigned long long)t.tv_sec * 1000000) + t.tv_usec;
 }
 
-void printMeta (std::string meta) {
-  std::cerr << meta << "\n";
+std::deque <std::pair<struct sockaddr_in, unsigned long long> > clients;
+
+
+void deleteClient(struct sockaddr_in &client) {
+  for (int i = 0; i < clients.size(); i++) {
+    if (clients[i].first.sin_addr.s_addr == client.sin_addr.s_addr &&
+        clients[i].first.sin_port == client.sin_port) {
+      clients.erase(clients.begin() + i);
+      break;
+    }
+  }
+}
+
+void updateClients(int &sock_udp) {
+  struct sockaddr_in client_address;
+  struct hostent *hostp;
+  char *hostaddrp;
+  socklen_t rcva_len;
+  ssize_t len = 1;
+  char buffer[BUFFER_SIZE];
+  struct pollfd fds[1] = {{sock_udp, 0 | POLLIN}};
+
+
+  while (len > 0) {
+    rcva_len = (socklen_t) sizeof(client_address);
+    if (poll(fds, 1, 100) == 0) {
+      break;
+    }
+    len = recvfrom(sock_udp, buffer, sizeof(buffer), 0, (struct sockaddr *) &client_address, &rcva_len);
+    if (len < 0) {
+      error("error on datagram from client socket");
+    }
+    deleteClient(client_address);
+    clients.push_back(std::make_pair(client_address, gettimelocal()));
+  }
 }
 
 std::string getUdpHeader (std::string type, int length) {
@@ -201,15 +240,47 @@ std::string getUdpHeader (std::string type, int length) {
 
 std::string getUdpMessage(std::string type, int length, std::string data) {
   std::string message = "";
-  if (type == "IAM") {
-    message += (getUdpHeader(type, length) + data);
-  }
+  message += (getUdpHeader(type, length) + data);
 
-  return message;
+  // return message;
+  return data;
 }
 
-void sendUdpMessage(int &sock, std::string message) {
+void sendUdpMessage(int &sock_udp, std::string message) {
+  unsigned long long current_time = gettimelocal();
+  ssize_t snd_len, len = message.size();
+  socklen_t snda_len;
+  struct sockaddr_in client_address;
+  for (auto client : clients) {
+    snda_len = (socklen_t) sizeof(client_address);
+    if (current_time - client.second < 5000000) {
+      client_address = client.first;
+      snd_len = sendto(sock_udp, message.c_str(), message.size(), 0, (struct sockaddr *) &client_address, snda_len);
+      if (snd_len != len) {
+        error("error on sending datagram to client socket");
+      }
+    }
+  }
+}
 
+void printData (std::string data, int &sock_udp) {
+  if (data.empty()) {
+    return;
+  }
+  updateClients(sock_udp);
+  std::string message = getUdpMessage("AUDIO", (int)data.size(), data);
+  sendUdpMessage(sock_udp, message);
+  // std::cout << message;
+}
+
+void printMeta (std::string meta, int &sock_udp) {
+  // if (meta.empty()) {
+  //   return;
+  // }
+  // updateClients(sock_udp);
+  // std::string message = getUdpMessage("METADATA", (int)meta.size(), meta);
+  // sendUdpMessage(sock_udp, message)
+  std::cout << meta << "\n";
 }
 
 std::string setRequest (std::string host, std::string resource, std::string meta) {
@@ -261,6 +332,18 @@ void setUdpConnection(int &sock, int &port, int timeout) {
     error ("socket");
   }
 
+
+  /* setsockopt: Handy debugging trick that lets
+   * us rerun the server immediately after we kill it;
+   * otherwise we have to wait about 20 secs.
+   * Eliminates "ERROR on binding: Address already in use" error.
+   */
+  int optval = 1;
+  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
+	     (const void *)&optval , sizeof(int));
+
+
+  // bzero((char *) &server_address, sizeof(server_address)); // ????
   server_address.sin_family = AF_INET; // IPv4
 	server_address.sin_addr.s_addr = htonl(INADDR_ANY); // listening on all interfaces
 	server_address.sin_port = htons(port); // default port for receiving is PORT_NUM
@@ -345,13 +428,13 @@ std::string handleHeader(int &sock, std::string &buffer, int timeout) {
   return getHeader(buffer);
 }
 
-void readDataWithoutMeta(int &sock, std::string &buffer, int timeout) {
-  printData(buffer);
+void readDataWithoutMeta(int &sock, int &sock_udp, std::string &buffer, int timeout) {
+  printData(buffer, sock_udp);
   ssize_t rcv_len = 1;
 
   while (rcv_len > 0) {
     rcv_len = readTCP(sock, buffer, timeout);
-    printData(buffer);
+    printData(buffer, sock_udp);
   }
 }
 
@@ -364,7 +447,7 @@ int getMetaSize(std::string &buffer) {
 }
 
 /* I know that buffer is not empty */
-void readMeta (int &sock, std::string &buffer, int timeout) {
+void readMeta (int &sock, int &sock_udp, std::string &buffer, int timeout) {
   int size = getMetaSize(buffer);
   buffer.erase(0, 1);
 
@@ -389,11 +472,11 @@ void readMeta (int &sock, std::string &buffer, int timeout) {
   }
 
   // std::cerr << "usuwam " << size << "\n";
-  printMeta(buffer.substr(0, size));
+  printMeta(buffer.substr(0, size), sock_udp);
   buffer.erase(0, size);
 }
 
-void readDataWithMeta(int &sock, std::string &buffer, int size, int timeout) {
+void readDataWithMeta(int &sock, int &sock_udp, std::string &buffer, int size, int timeout) {
   int counter = size;
   std::string tmp = "";
   ssize_t rcv_len = 1;
@@ -408,20 +491,20 @@ void readDataWithMeta(int &sock, std::string &buffer, int size, int timeout) {
     if (buffer.size() <= counter) {
       counter -= buffer.size();
       // std::cerr << buffer.size() << "<\n";
-      printData(buffer);
+      printData(buffer, sock_udp);
       buffer = "";
     }
     else {
       // std::cerr << counter << "\n";
-      printData(buffer.substr(0, counter));
+      printData(buffer.substr(0, counter), sock_udp);
       buffer.erase(0, counter);
-      readMeta(sock, buffer, timeout);
+      readMeta(sock, sock_udp, buffer, timeout);
       counter = size;
     }
   }
 }
 
-void handleResponse(int &sock, std::string &meta, int timeout) {
+void handleResponse(int &sock, int &sock_udp, std::string &meta, int timeout) {
   std::string buffer = "";
   std::string header = handleHeader(sock, buffer, timeout);
 
@@ -438,15 +521,17 @@ void handleResponse(int &sock, std::string &meta, int timeout) {
   // std::cerr << "metaint = " << metaIntVal << "\n";
 
   if (metaIntVal == -1) {
-    readDataWithoutMeta(sock, buffer, timeout);
+    readDataWithoutMeta(sock, sock_udp, buffer, timeout);
   }
   else {
     if (meta != "yes") {
       error("We did not ask server for meta data");
     }
-    readDataWithMeta(sock, buffer, metaIntVal, timeout);
+    readDataWithMeta(sock, sock_udp, buffer, metaIntVal, timeout);
   }
 }
+
+// void handleClients()
 
 int main(int argc, char** argv) {
   /* for A part of the task */
@@ -462,7 +547,7 @@ int main(int argc, char** argv) {
 
   std::string message = setRequest(host, resource, meta);
   sendRequest(sock, message);
-  handleResponse(sock, meta, timeout);
+  handleResponse(sock, sock_udp, meta, timeout);
 
   (void) close(sock);
 
