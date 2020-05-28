@@ -254,6 +254,7 @@ void sendUdpMessage(int &sock_udp, std::string message) {
   for (auto client : clients) {
     snda_len = (socklen_t) sizeof(client_address);
     if (current_time - client.second < 5000000) {
+      // std::cout << "sending to " << client.first.sin_port << "\n";
       client_address = client.first;
       snd_len = sendto(sock_udp, message.c_str(), message.size(), 0, (struct sockaddr *) &client_address, snda_len);
       if (snd_len != len) {
