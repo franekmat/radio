@@ -28,6 +28,8 @@
 
 typedef std::deque <std::pair<struct sockaddr_in, unsigned long long> > ClientsDeque;
 
+bool ACTIVATE_CLIENTS = false;
+
 void error(std::string err_msg)
 {
   const char *err_message = err_msg.c_str();
@@ -147,6 +149,7 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
       case 'P' :
         checkPort(optarg);
         port_clients_inp = true;
+        ACTIVATE_CLIENTS = true;
         port_clients = getValueFromString(optarg, "port");
         break;
       case 'B' :
@@ -324,23 +327,28 @@ void printData (std::string data, int &sock_udp, ClientsDeque &clients, std::str
   if (data.empty()) {
     return;
   }
-  // std::cout << "liczba klientow przed: " << clients.size() << "\n";
-  updateClients(sock_udp, clients, radio_name);
-  // std::cout << "liczba klientow po: " << clients.size() << "\n";
-  std::string message = getUdpMessage("AUDIO", (int)data.size(), data);
-  sendUdpMessage(sock_udp, message, clients);
-  // std::cout << message;
+  if (ACTIVATE_CLIENTS) {
+    updateClients(sock_udp, clients, radio_name);
+    std::string message = getUdpMessage("AUDIO", (int)data.size(), data);
+    sendUdpMessage(sock_udp, message, clients);
+  }
+  else {
+    std::cout << data;
+  }
 }
 
 void printMeta (std::string meta, int &sock_udp, ClientsDeque &clients, std::string radio_name) {
-  // std::cout << "----- printing meta -------- " << meta.size() << "\n";
   if (meta.empty()) {
     return;
   }
-  updateClients(sock_udp, clients, radio_name);
-  std::string message = getUdpMessage("METADATA", (int)meta.size(), meta);
-  sendUdpMessage(sock_udp, message, clients);
-  // std::cout << meta << "\n";
+  if (ACTIVATE_CLIENTS) {
+    updateClients(sock_udp, clients, radio_name);
+    std::string message = getUdpMessage("METADATA", (int)meta.size(), meta);
+    sendUdpMessage(sock_udp, message, clients);
+  }
+  else {
+    std::cerr << meta;
+  }
 }
 
 std::string setRequest (std::string host, std::string resource, std::string meta) {
