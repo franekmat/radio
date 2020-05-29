@@ -254,7 +254,7 @@ std::string getUdpMessage(std::string type, int length, std::string data) {
   // return data;
 }
 
-void updateClients(int &sock_udp, ClientsDeque &clients) {
+void updateClients(int &sock_udp, ClientsDeque &clients, std::string radio_name) {
   struct sockaddr_in client_address;
   struct hostent *hostp;
   char *hostaddrp;
@@ -275,7 +275,7 @@ void updateClients(int &sock_udp, ClientsDeque &clients) {
     }
 
     if (getType(bytesToInt(buffer[0], buffer[1])) == "DISCOVER") {
-      std::string message = getUdpHeader("IAM", 5) + "RADIO";
+      std::string message = getUdpHeader("IAM", radio_name.size()) + radio_name;
       ssize_t snd_len = sendto(sock_udp, message.data(), message.size(), 0, (struct sockaddr *) &client_address, rcva_len);
       if (snd_len != message.size()) {
         error("error on sending datagram to client socket");
@@ -320,24 +320,24 @@ void sendUdpMessage(int &sock_udp, std::string message, ClientsDeque &clients) {
   }
 }
 
-void printData (std::string data, int &sock_udp, ClientsDeque &clients) {
+void printData (std::string data, int &sock_udp, ClientsDeque &clients, std::string radio_name) {
   if (data.empty()) {
     return;
   }
   // std::cout << "liczba klientow przed: " << clients.size() << "\n";
-  updateClients(sock_udp, clients);
+  updateClients(sock_udp, clients, radio_name);
   // std::cout << "liczba klientow po: " << clients.size() << "\n";
   std::string message = getUdpMessage("AUDIO", (int)data.size(), data);
   sendUdpMessage(sock_udp, message, clients);
   // std::cout << message;
 }
 
-void printMeta (std::string meta, int &sock_udp, ClientsDeque &clients) {
+void printMeta (std::string meta, int &sock_udp, ClientsDeque &clients, std::string radio_name) {
   // std::cout << "----- printing meta -------- " << meta.size() << "\n";
   if (meta.empty()) {
     return;
   }
-  updateClients(sock_udp, clients);
+  updateClients(sock_udp, clients, radio_name);
   std::string message = getUdpMessage("METADATA", (int)meta.size(), meta);
   sendUdpMessage(sock_udp, message, clients);
   // std::cout << meta << "\n";
@@ -434,6 +434,13 @@ int getMetaInt (std::string header) {
   return getValueFromString(value, "metaint");
 }
 
+/* get radio name from header */
+std::string getMetaName (std::string header) {
+  std::size_t found = header.find("icy-name:");
+  header.erase(0, found + strlen("icy-name:"));
+  return header.substr(0, header.find("\r\n"));
+}
+
 bool containsEndOfHeader(std::string &buffer) {
   return (buffer.find("\r\n\r\n") != std::string::npos);
 }
@@ -488,13 +495,13 @@ std::string handleHeader(int &sock, std::string &buffer, int timeout) {
   return getHeader(buffer);
 }
 
-void readDataWithoutMeta(int &sock, int &sock_udp, std::string &buffer, int timeout, ClientsDeque &clients) {
-  printData(buffer, sock_udp, clients);
+void readDataWithoutMeta(int &sock, int &sock_udp, std::string &buffer, int timeout, ClientsDeque &clients, std::string radio_name) {
+  printData(buffer, sock_udp, clients, radio_name);
   ssize_t rcv_len = 1;
 
   while (rcv_len > 0) {
     rcv_len = readTCP(sock, buffer, timeout);
-    printData(buffer, sock_udp, clients);
+    printData(buffer, sock_udp, clients, radio_name);
   }
 }
 
@@ -507,7 +514,7 @@ int getMetaSize(std::string &buffer) {
 }
 
 /* I know that buffer is not empty */
-void readMeta (int &sock, int &sock_udp, std::string &buffer, int timeout, ClientsDeque &clients) {
+void readMeta (int &sock, int &sock_udp, std::string &buffer, int timeout, ClientsDeque &clients, std::string radio_name) {
   int size = getMetaSize(buffer);
   buffer.erase(0, 1);
 
@@ -532,11 +539,11 @@ void readMeta (int &sock, int &sock_udp, std::string &buffer, int timeout, Clien
   }
 
   // std::cerr << "usuwam " << size << "\n";
-  printMeta(buffer.substr(0, size), sock_udp, clients);
+  printMeta(buffer.substr(0, size), sock_udp, clients, radio_name);
   buffer.erase(0, size);
 }
 
-void readDataWithMeta(int &sock, int &sock_udp, std::string &buffer, int size, int timeout, ClientsDeque &clients) {
+void readDataWithMeta(int &sock, int &sock_udp, std::string &buffer, int size, int timeout, ClientsDeque &clients, std::string radio_name) {
   int counter = size;
   std::string tmp = "";
   ssize_t rcv_len = 1;
@@ -551,14 +558,14 @@ void readDataWithMeta(int &sock, int &sock_udp, std::string &buffer, int size, i
     if (buffer.size() <= counter) {
       counter -= buffer.size();
       // std::cerr << buffer.size() << "<\n";
-      printData(buffer, sock_udp, clients);
+      printData(buffer, sock_udp, clients, radio_name);
       buffer = "";
     }
     else {
       // std::cerr << counter << "\n";
-      printData(buffer.substr(0, counter), sock_udp, clients);
+      printData(buffer.substr(0, counter), sock_udp, clients, radio_name);
       buffer.erase(0, counter);
-      readMeta(sock, sock_udp, buffer, timeout, clients);
+      readMeta(sock, sock_udp, buffer, timeout, clients, radio_name);
       counter = size;
     }
   }
@@ -573,6 +580,8 @@ void handleResponse(int &sock, int &sock_udp, std::string &meta, int timeout, Cl
     error("Bad status");
   }
 
+  std::string radio_name = getMetaName(header);
+
   int metaIntVal = -1;
   if (containsMeta(header)) {
     metaIntVal = getMetaInt(header);
@@ -581,13 +590,13 @@ void handleResponse(int &sock, int &sock_udp, std::string &meta, int timeout, Cl
   // std::cerr << "metaint = " << metaIntVal << "\n";
 
   if (metaIntVal == -1) {
-    readDataWithoutMeta(sock, sock_udp, buffer, timeout, clients);
+    readDataWithoutMeta(sock, sock_udp, buffer, timeout, clients, radio_name);
   }
   else {
     if (meta != "yes") {
       error("We did not ask server for meta data");
     }
-    readDataWithMeta(sock, sock_udp, buffer, metaIntVal, timeout, clients);
+    readDataWithMeta(sock, sock_udp, buffer, metaIntVal, timeout, clients, radio_name);
   }
 }
 
