@@ -205,62 +205,6 @@ std::string getType (int n) {
   }
 }
 
-void receiveUdpData (int &sock, struct sockaddr_in &my_address) {
-  while(1) { //dodać poruszanie strzalkami?
-    char buffer[BUFFER_SIZE];
-    socklen_t snda_len, rcva_len;
-  	ssize_t len, snd_len, rcv_len;
-    struct sockaddr_in srvr_address;
-
-    std::string nth = getUdpHeader("KEEPALIVE", 0);
-    len = nth.size();
-
-
-    // std::cout << "wysylam " << nth << "\n";
-
-    rcva_len = (socklen_t) sizeof(my_address);
-    snd_len = sendto(sock, nth.data(), nth.size(), 0,
-        (struct sockaddr *) &my_address, rcva_len);
-    if (snd_len != (ssize_t) len) {
-      error("partial / failed write");
-    }
-    // std::cout << "wyslalem\n";
-
-    (void) memset(buffer, 0, sizeof(buffer));
-    len = (size_t) sizeof(buffer) - 1;
-    rcva_len = (socklen_t) sizeof(srvr_address);
-
-    std::string tmp;
-    tmp.resize(BUFFER_SIZE);
-    rcv_len = recvfrom(sock, &tmp[0], len, 0,
-        (struct sockaddr *) &srvr_address, &rcva_len);
-    if (rcv_len < 0) {
-      error("read");
-    }
-    tmp.resize(rcv_len);
-
-
-    if (rcv_len < 4) {
-      error("wrong size of rcv_len");
-    }
-
-    std::string type = getType(bytesToInt(tmp[0], tmp[1]));
-    int leng = bytesToInt(tmp[2], tmp[3]);
-    tmp.erase(0, 4);
-
-    // std::cout << type << "\n";
-
-    if (type == "AUDIO") {
-      // std::cout << "no i co?\n";
-      // std::cout << tmp.size() << "\n";
-      std::cout << tmp;
-    }
-    else if (type == "METADATA") {
-      std::cerr << tmp;
-    }
-  }
-}
-
 int newTelnetConnection(int &sock_telnet, int &port_tcp) {
   struct sockaddr_in server, their_addr;
   struct sigaction action;
@@ -327,6 +271,67 @@ void setupTelnet(int &msgsock, std::vector<std::string> &telnet_menu) {
   writeTelnetMenu(msgsock, telnet_menu, 0);
 }
 
+void receiveUdpData (int &sock, struct sockaddr_in &my_address, int &msgsock, std::vector<std::string> &telnet_menu) {
+  while(1) { //dodać poruszanie strzalkami?
+    char buffer[BUFFER_SIZE];
+    socklen_t snda_len, rcva_len;
+  	ssize_t len, snd_len, rcv_len;
+    struct sockaddr_in srvr_address;
+
+    std::string nth = getUdpHeader("KEEPALIVE", 0);
+    len = nth.size();
+
+
+    // std::cout << "wysylam " << nth << "\n";
+
+    rcva_len = (socklen_t) sizeof(my_address);
+    snd_len = sendto(sock, nth.data(), nth.size(), 0,
+        (struct sockaddr *) &my_address, rcva_len);
+    if (snd_len != (ssize_t) len) {
+      error("partial / failed write");
+    }
+    // std::cout << "wyslalem\n";
+
+    (void) memset(buffer, 0, sizeof(buffer));
+    len = (size_t) sizeof(buffer) - 1;
+    rcva_len = (socklen_t) sizeof(srvr_address);
+
+    std::string tmp;
+    tmp.resize(BUFFER_SIZE);
+    rcv_len = recvfrom(sock, &tmp[0], len, 0,
+        (struct sockaddr *) &srvr_address, &rcva_len);
+    if (rcv_len < 0) {
+      error("read");
+    }
+    tmp.resize(rcv_len);
+
+
+    if (rcv_len < 4) {
+      error("wrong size of rcv_len");
+    }
+
+    std::string type = getType(bytesToInt(tmp[0], tmp[1]));
+    int leng = bytesToInt(tmp[2], tmp[3]);
+    tmp.erase(0, 4);
+
+    // std::cout << type << "\n";
+
+    if (type == "AUDIO") {
+      // std::cout << "no i co?\n";
+      // std::cout << tmp.size() << "\n";
+      std::cout << tmp;
+    }
+    else if (type == "METADATA") {
+      // std::cerr << tmp;
+      if (telnet_menu.back() != "Koniec") {
+        telnet_menu.pop_back();
+      }
+      telnet_menu.push_back(tmp);
+      writeTelnetMenu(msgsock, telnet_menu, 0);
+    }
+  }
+}
+
 void searchProxy (int &sock_udp, struct sockaddr_in &my_address, int &msgsock, std::vector<std::string> &telnet_menu) {
   char buffer[BUFFER_SIZE];
   socklen_t snda_len, rcva_len;
@@ -372,10 +377,21 @@ void searchProxy (int &sock_udp, struct sockaddr_in &my_address, int &msgsock, s
     //lepiej to dać po pętli, a tutaj wrzucać do jakiegoś wektora żeby potem
     //raz zaktualizować menu
     if (getType(type) == "IAM") {
-      telnet_menu.pop_back();
-      telnet_menu.push_back(tmp);
-      telnet_menu.push_back("Koniec");
-      writeTelnetMenu(msgsock, telnet_menu, 0);
+      if (telnet_menu.back() == "Koniec") {
+        telnet_menu.pop_back();
+        telnet_menu.push_back(tmp);
+        telnet_menu.push_back("Koniec");
+        writeTelnetMenu(msgsock, telnet_menu, 0);
+      }
+      else {
+        std::string meta = telnet_menu.back();
+        telnet_menu.pop_back();
+        telnet_menu.pop_back();
+        telnet_menu.push_back(tmp);
+        telnet_menu.push_back("Koniec");
+        telnet_menu.push_back(meta);
+        writeTelnetMenu(msgsock, telnet_menu, 0);
+      }
     }
   }
 }
@@ -427,7 +443,7 @@ void runTelnet(int &msgsock, std::vector<std::string> &telnet_menu, int &sock_ud
         }
       }
       else {
-        receiveUdpData (sock_udp, my_address);
+        receiveUdpData (sock_udp, my_address, msgsock, telnet_menu);
       }
     }
   }
