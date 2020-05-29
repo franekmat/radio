@@ -14,6 +14,7 @@
 #include <sys/time.h>
 #include <arpa/inet.h>
 #include <stdexcept>
+#include <algorithm>
 #include "err.h"
 
 #define DEFAULT_TIMEOUT 5
@@ -245,7 +246,7 @@ std::string getUdpMessage(std::string type, int length, std::string data) {
   std::string message = "";
   message += (getUdpHeader(type, length));// + data);
 
-  if (type == "AUDIO") {
+  if (type == "AUDIO" || type == "METADATA") {
     message += data;
   }
 
@@ -303,9 +304,17 @@ void sendUdpMessage(int &sock_udp, std::string message, ClientsDeque &clients) {
     if (current_time - client.second < 5000000) {
       std::cout << "sending " << message.size() << " to " << client.first.sin_port << "\n";
       client_address = client.first;
-      snd_len = sendto(sock_udp, message.c_str(), message.size(), 0, (struct sockaddr *) &client_address, snda_len);
-      if (snd_len != len) {
-        error("error on sending datagram to client socket");
+      while (!message.empty()) {
+        std::string mess = message.substr(0, std::min((int)message.size(), BUFFER_SIZE - 1));
+        snd_len = sendto(sock_udp, mess.data(), mess.size(), 0, (struct sockaddr *) &client_address, snda_len);
+        if (snd_len != mess.size()) {
+          error("error on sending datagram to client socket");
+        }
+        message.erase(4, mess.size() - 4);
+
+        if (message.size() == 4) {
+          break;
+        }
       }
     }
   }
@@ -324,13 +333,14 @@ void printData (std::string data, int &sock_udp, ClientsDeque &clients) {
 }
 
 void printMeta (std::string meta, int &sock_udp, ClientsDeque &clients) {
-  // if (meta.empty()) {
-  //   return;
-  // }
-  // updateClients(sock_udp);
-  // std::string message = getUdpMessage("METADATA", (int)meta.size(), meta);
-  // sendUdpMessage(sock_udp, message)
-  std::cout << meta << "\n";
+  // std::cout << "----- printing meta -------- " << meta.size() << "\n";
+  if (meta.empty()) {
+    return;
+  }
+  updateClients(sock_udp, clients);
+  std::string message = getUdpMessage("METADATA", (int)meta.size(), meta);
+  sendUdpMessage(sock_udp, message, clients);
+  // std::cout << meta << "\n";
 }
 
 std::string setRequest (std::string host, std::string resource, std::string meta) {

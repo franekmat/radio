@@ -248,6 +248,8 @@ void receiveUdpData (int &sock, struct sockaddr_in &my_address) {
     int leng = bytesToInt(tmp[2], tmp[3]);
     tmp.erase(0, 4);
 
+    // std::cout << type << "\n";
+
     if (type == "AUDIO") {
       // std::cout << "no i co?\n";
       // std::cout << tmp.size() << "\n";
@@ -416,7 +418,7 @@ void runTelnet(int &msgsock, std::vector<std::string> &telnet_menu, int &sock_ud
     }
     else if (enter(buf, len)) {
       if (curr_pos == 0) {
-        std::cout << "start searching proxy\n";
+        // std::cout << "start searching proxy\n";
         searchProxy(sock_udp, my_address, msgsock, telnet_menu);
       }
       else if (curr_pos == (int) telnet_menu.size() - 1) {
