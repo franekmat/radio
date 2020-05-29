@@ -18,7 +18,7 @@
 
 #define DEFAULT_TIMEOUT 5
 #define DEFAULT_META "no"
-#define BUFFER_SIZE 5005
+#define BUFFER_SIZE 2048
 
 void error(std::string err_msg)
 {
