@@ -177,38 +177,42 @@ unsigned long long gettimelocal() {
    return ((unsigned long long)t.tv_sec * 1000000) + t.tv_usec;
 }
 
-void deleteClient(struct sockaddr_in &client, ClientsDeque &clients) {
+int bytesToInt (char b1, char b2) {
+  int res = 0;
+  res <<= 8;
+  res |= b1;
+  res <<= 8;
+  res |= b2;
+  return res;
+}
+
+std::string getType (int n) {
+  if (n == 1) {
+    return "DISCOVER";
+  }
+  else if (n == 2) {
+    return "IAM";
+  }
+  else if (n == 3) {
+    return "KEEPALIVE";
+  }
+  else if (n == 4) {
+    return "AUDIO";
+  }
+  else {
+    return "METADATA";
+  }
+}
+
+bool deleteClient(struct sockaddr_in &client, ClientsDeque &clients) {
   for (int i = 0; i < clients.size(); i++) {
     if (clients[i].first.sin_addr.s_addr == client.sin_addr.s_addr &&
         clients[i].first.sin_port == client.sin_port) {
       clients.erase(clients.begin() + i);
-      break;
+      return true;
     }
   }
-}
-
-void updateClients(int &sock_udp, ClientsDeque &clients) {
-  struct sockaddr_in client_address;
-  struct hostent *hostp;
-  char *hostaddrp;
-  socklen_t rcva_len;
-  ssize_t len = 1;
-  char buffer[BUFFER_SIZE];
-  struct pollfd fds[1] = {{sock_udp, 0 | POLLIN}};
-
-
-  while (len > 0) {
-    rcva_len = (socklen_t) sizeof(client_address);
-    if (poll(fds, 1, 100) == 0) {
-      break;
-    }
-    len = recvfrom(sock_udp, buffer, sizeof(buffer), 0, (struct sockaddr *) &client_address, &rcva_len);
-    if (len < 0) {
-      error("error on datagram from client socket");
-    }
-    deleteClient(client_address, clients);
-    clients.push_back(std::make_pair(client_address, gettimelocal()));
-  }
+  return false;
 }
 
 std::string getUdpHeader (std::string type, int length) {
@@ -239,10 +243,54 @@ std::string getUdpHeader (std::string type, int length) {
 
 std::string getUdpMessage(std::string type, int length, std::string data) {
   std::string message = "";
-  message += (getUdpHeader(type, length) + data);
+  message += (getUdpHeader(type, length));// + data);
 
-  // return message;
-  return data;
+  if (type == "AUDIO") {
+    message += data;
+  }
+
+  return message;
+  // return data;
+}
+
+void updateClients(int &sock_udp, ClientsDeque &clients) {
+  struct sockaddr_in client_address;
+  struct hostent *hostp;
+  char *hostaddrp;
+  socklen_t rcva_len;
+  ssize_t len = 1;
+  char buffer[BUFFER_SIZE];
+  struct pollfd fds[1] = {{sock_udp, 0 | POLLIN}};
+
+
+  while (len > 0) {
+    rcva_len = (socklen_t) sizeof(client_address);
+    if (poll(fds, 1, 100) == 0) {
+      break;
+    }
+    len = recvfrom(sock_udp, buffer, sizeof(buffer), 0, (struct sockaddr *) &client_address, &rcva_len);
+    if (len < 0) {
+      error("error on datagram from client socket");
+    }
+
+    if (getType(bytesToInt(buffer[0], buffer[1])) == "DISCOVER") {
+      std::string message = getUdpHeader("IAM", 5) + "RADIO";
+      ssize_t snd_len = sendto(sock_udp, message.data(), message.size(), 0, (struct sockaddr *) &client_address, rcva_len);
+      if (snd_len != message.size()) {
+        error("error on sending datagram to client socket");
+      }
+    }
+    // else if (!deleteClient(client_address, clients)) {
+    else {
+      deleteClient(client_address, clients);
+      // std::string message = getUdpHeader("IAM", 5) + "RADIO";
+      // ssize_t snd_len = sendto(sock_udp, message.data(), message.size(), 0, (struct sockaddr *) &client_address, rcva_len);
+      // if (snd_len != message.size()) {
+      //   error("error on sending datagram to client socket");
+      // }
+      clients.push_back(std::make_pair(client_address, gettimelocal()));
+    }
+  }
 }
 
 void sendUdpMessage(int &sock_udp, std::string message, ClientsDeque &clients) {
@@ -253,7 +301,7 @@ void sendUdpMessage(int &sock_udp, std::string message, ClientsDeque &clients) {
   for (auto client : clients) {
     snda_len = (socklen_t) sizeof(client_address);
     if (current_time - client.second < 5000000) {
-      std::cout << "sending to " << client.first.sin_port << "\n";
+      std::cout << "sending " << message.size() << " to " << client.first.sin_port << "\n";
       client_address = client.first;
       snd_len = sendto(sock_udp, message.c_str(), message.size(), 0, (struct sockaddr *) &client_address, snda_len);
       if (snd_len != len) {
@@ -267,7 +315,9 @@ void printData (std::string data, int &sock_udp, ClientsDeque &clients) {
   if (data.empty()) {
     return;
   }
+  // std::cout << "liczba klientow przed: " << clients.size() << "\n";
   updateClients(sock_udp, clients);
+  // std::cout << "liczba klientow po: " << clients.size() << "\n";
   std::string message = getUdpMessage("AUDIO", (int)data.size(), data);
   sendUdpMessage(sock_udp, message, clients);
   // std::cout << message;
