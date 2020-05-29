@@ -28,6 +28,12 @@
 
 typedef std::deque <std::pair<struct sockaddr_in, unsigned long long> > ClientsDeque;
 
+/*
+   Program radio-proxy uruchomiony bez parametru -P ma działać
+   wg specyfikacji części A zadania.
+   ACTIVATE_CLIENTS = false, gdy nie ma -P
+   ACTIVATE_CLIENTS = true, gdy jest -P
+*/
 bool ACTIVATE_CLIENTS = false;
 
 void error(std::string err_msg)
