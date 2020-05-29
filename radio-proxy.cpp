@@ -313,15 +313,16 @@ void sendUdpMessage(int &sock_udp, std::string message, ClientsDeque &clients) {
     if (current_time - client.second < 5000000) {
       std::cout << "sending " << message.size() << " to " << client.first.sin_port << "\n";
       client_address = client.first;
-      while (!message.empty()) {
-        std::string mess = message.substr(0, std::min((int)message.size(), BUFFER_SIZE - 1));
+      std::string tmp_message = message;
+      while (!tmp_message.empty()) {
+        std::string mess = tmp_message.substr(0, std::min((int)tmp_message.size(), BUFFER_SIZE - 1));
         snd_len = sendto(sock_udp, mess.data(), mess.size(), 0, (struct sockaddr *) &client_address, snda_len);
         if (snd_len != mess.size()) {
           error("error on sending datagram to client socket");
         }
-        message.erase(4, mess.size() - 4);
+        tmp_message.erase(4, mess.size() - 4);
 
-        if (message.size() == 4) {
+        if (tmp_message.size() == 4) {
           break;
         }
       }
