@@ -301,7 +301,12 @@ unsigned long long gettimelocal() {
    return ((unsigned long long)t.tv_sec * 1000000) + t.tv_usec;
 }
 
-void receiveUdpData (int &sock_udp, struct sockaddr_in &my_address, int &msgsock, std::vector<std::string> &telnet_menu, int &curr_pos) {
+void deleteRadio(int &msgsock, std::vector<std::string> &telnet_menu, int radio_pos) {
+  telnet_menu.erase(telnet_menu.begin() + radio_pos);
+  writeTelnetMenu(msgsock, telnet_menu, 0);
+}
+
+void receiveUdpData (int &sock_udp, struct sockaddr_in &my_address, int &msgsock, std::vector<std::string> &telnet_menu, int radio_pos, int &curr_pos, int timeout) {
   unsigned long long last_time = -1;
   while(1) { //dodać poruszanie strzalkami?
     char buffer[BUFFER_SIZE];
@@ -328,6 +333,7 @@ void receiveUdpData (int &sock_udp, struct sockaddr_in &my_address, int &msgsock
         if (curr_pos == 0) {
           // std::cout << "start searching proxy\n";
           searchProxy(sock_udp, my_address, msgsock, telnet_menu, curr_pos);
+          return;
         }
         else if (curr_pos == (int) telnet_menu.size() - 1) {
           if (close(msgsock) < 0) {
@@ -335,7 +341,8 @@ void receiveUdpData (int &sock_udp, struct sockaddr_in &my_address, int &msgsock
           }
         }
         else {
-          receiveUdpData (sock_udp, my_address, msgsock, telnet_menu, curr_pos);
+          receiveUdpData (sock_udp, my_address, msgsock, telnet_menu, radio_pos, curr_pos, timeout);
+          return;
         }
       }
     }
@@ -360,7 +367,13 @@ void receiveUdpData (int &sock_udp, struct sockaddr_in &my_address, int &msgsock
     rcva_len = (socklen_t) sizeof(srvr_address);
 
     std::string tmp;
+    struct pollfd fds2[1] = {{sock_udp, 0 | POLLIN}};
+
     tmp.resize(BUFFER_SIZE);
+    if (poll(fds2, 1, timeout * 1000) == 0) {
+      deleteRadio(msgsock, telnet_menu, radio_pos);
+      return;
+    }
     rcv_len = recvfrom(sock_udp, &tmp[0], len, 0,
         (struct sockaddr *) &srvr_address, &rcva_len);
     if (rcv_len < 0) {
@@ -458,7 +471,7 @@ void searchProxy (int &sock_udp, struct sockaddr_in &my_address, int &msgsock, s
   }
 }
 
-void runTelnet(int &msgsock, std::vector<std::string> &telnet_menu, int &sock_udp, struct sockaddr_in &my_address) {
+void runTelnet(int &msgsock, std::vector<std::string> &telnet_menu, int &sock_udp, struct sockaddr_in &my_address, int timeout) {
   int curr_pos = 0;
   while(1) {
     int buf_size = 16;
@@ -484,7 +497,7 @@ void runTelnet(int &msgsock, std::vector<std::string> &telnet_menu, int &sock_ud
         }
       }
       else {
-        receiveUdpData (sock_udp, my_address, msgsock, telnet_menu, curr_pos);
+        receiveUdpData (sock_udp, my_address, msgsock, telnet_menu, curr_pos, curr_pos, timeout);
       }
     }
   }
@@ -504,7 +517,7 @@ int main(int argc, char** argv) {
   // receiveUdpData (sock, my_address);
   int msgsock = newTelnetConnection(sock_telnet, port_tcp);
   setupTelnet(msgsock, telnet_menu);
-  runTelnet(msgsock, telnet_menu, sock, my_address);
+  runTelnet(msgsock, telnet_menu, sock, my_address, timeout);
 
   return 0;
 }
