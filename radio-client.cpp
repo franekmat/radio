@@ -271,21 +271,75 @@ void setupTelnet(int &msgsock, std::vector<std::string> &telnet_menu) {
   writeTelnetMenu(msgsock, telnet_menu, 0);
 }
 
-void receiveUdpData (int &sock, struct sockaddr_in &my_address, int &msgsock, std::vector<std::string> &telnet_menu) {
+bool arrowUp (char *buf, int len) {
+  if (len == 3 && buf[0] == 27 && buf[1] == 91 && buf[2] == 65) {
+    return true;
+  }
+  return false;
+}
+
+bool arrowDown (char *buf, int len) {
+  if (len == 3 && buf[0] == 27 && buf[1] == 91 && buf[2] == 66) {
+    return true;
+  }
+  return false;
+}
+
+bool enter (char *buf, int len) {
+  if (len == 2 && buf[0] == 13 && buf[1] == 0) {
+    return true;
+  }
+  return false;
+}
+
+void searchProxy (int &sock_udp, struct sockaddr_in &my_address, int &msgsock, std::vector<std::string> &telnet_menu, int &curr_pos);
+
+
+void receiveUdpData (int &sock_udp, struct sockaddr_in &my_address, int &msgsock, std::vector<std::string> &telnet_menu, int &curr_pos) {
   while(1) { //dodać poruszanie strzalkami?
     char buffer[BUFFER_SIZE];
     socklen_t snda_len, rcva_len;
   	ssize_t len, snd_len, rcv_len;
     struct sockaddr_in srvr_address;
 
+
+    int buf_size = 16;
+    char buf[buf_size];
+    struct pollfd fds[1] = {{msgsock, 0 | POLLIN}};
+    if (poll(fds, 1, 10) != 0) {
+      len = recv(msgsock, buf, buf_size, 0);
+
+      if (arrowUp(buf, len)) {
+        curr_pos = std::max(0, curr_pos - 1);
+        writeTelnetMenu(msgsock, telnet_menu, curr_pos);
+      }
+      else if (arrowDown(buf, len)) {
+        curr_pos = std::min(curr_pos + 1, (int)telnet_menu.size() - 1);
+        writeTelnetMenu(msgsock, telnet_menu, curr_pos);
+      }
+      else if (enter(buf, len)) {
+        if (curr_pos == 0) {
+          // std::cout << "start searching proxy\n";
+          searchProxy(sock_udp, my_address, msgsock, telnet_menu, curr_pos);
+        }
+        else if (curr_pos == (int) telnet_menu.size() - 1) {
+          if (close(msgsock) < 0) {
+            error("Closing socket");
+          }
+        }
+        else {
+          receiveUdpData (sock_udp, my_address, msgsock, telnet_menu, curr_pos);
+        }
+      }
+    }
+
     std::string nth = getUdpHeader("KEEPALIVE", 0);
     len = nth.size();
-
 
     // std::cout << "wysylam " << nth << "\n";
 
     rcva_len = (socklen_t) sizeof(my_address);
-    snd_len = sendto(sock, nth.data(), nth.size(), 0,
+    snd_len = sendto(sock_udp, nth.data(), nth.size(), 0,
         (struct sockaddr *) &my_address, rcva_len);
     if (snd_len != (ssize_t) len) {
       error("partial / failed write");
@@ -298,13 +352,12 @@ void receiveUdpData (int &sock, struct sockaddr_in &my_address, int &msgsock, st
 
     std::string tmp;
     tmp.resize(BUFFER_SIZE);
-    rcv_len = recvfrom(sock, &tmp[0], len, 0,
+    rcv_len = recvfrom(sock_udp, &tmp[0], len, 0,
         (struct sockaddr *) &srvr_address, &rcva_len);
     if (rcv_len < 0) {
       error("read");
     }
     tmp.resize(rcv_len);
-
 
     if (rcv_len < 4) {
       error("wrong size of rcv_len");
@@ -332,7 +385,7 @@ void receiveUdpData (int &sock, struct sockaddr_in &my_address, int &msgsock, st
   }
 }
 
-void searchProxy (int &sock_udp, struct sockaddr_in &my_address, int &msgsock, std::vector<std::string> &telnet_menu) {
+void searchProxy (int &sock_udp, struct sockaddr_in &my_address, int &msgsock, std::vector<std::string> &telnet_menu, int &curr_pos) {
   char buffer[BUFFER_SIZE];
   socklen_t snda_len, rcva_len;
 	ssize_t len, snd_len, rcv_len;
@@ -396,27 +449,6 @@ void searchProxy (int &sock_udp, struct sockaddr_in &my_address, int &msgsock, s
   }
 }
 
-bool arrowUp (char *buf, int len) {
-  if (len == 3 && buf[0] == 27 && buf[1] == 91 && buf[2] == 65) {
-    return true;
-  }
-  return false;
-}
-
-bool arrowDown (char *buf, int len) {
-  if (len == 3 && buf[0] == 27 && buf[1] == 91 && buf[2] == 66) {
-    return true;
-  }
-  return false;
-}
-
-bool enter (char *buf, int len) {
-  if (len == 2 && buf[0] == 13 && buf[1] == 0) {
-    return true;
-  }
-  return false;
-}
-
 void runTelnet(int &msgsock, std::vector<std::string> &telnet_menu, int &sock_udp, struct sockaddr_in &my_address) {
   int curr_pos = 0;
   while(1) {
@@ -435,7 +467,7 @@ void runTelnet(int &msgsock, std::vector<std::string> &telnet_menu, int &sock_ud
     else if (enter(buf, len)) {
       if (curr_pos == 0) {
         // std::cout << "start searching proxy\n";
-        searchProxy(sock_udp, my_address, msgsock, telnet_menu);
+        searchProxy(sock_udp, my_address, msgsock, telnet_menu, curr_pos);
       }
       else if (curr_pos == (int) telnet_menu.size() - 1) {
         if (close(msgsock) < 0) {
@@ -443,7 +475,7 @@ void runTelnet(int &msgsock, std::vector<std::string> &telnet_menu, int &sock_ud
         }
       }
       else {
-        receiveUdpData (sock_udp, my_address, msgsock, telnet_menu);
+        receiveUdpData (sock_udp, my_address, msgsock, telnet_menu, curr_pos);
       }
     }
   }
