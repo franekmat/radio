@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <vector>
 #include <algorithm>
+#include <sys/time.h>
 #include "err.h"
 
 #define DEFAULT_TIMEOUT 5
@@ -294,8 +295,14 @@ bool enter (char *buf, int len) {
 
 void searchProxy (int &sock_udp, struct sockaddr_in &my_address, int &msgsock, std::vector<std::string> &telnet_menu, int &curr_pos);
 
+unsigned long long gettimelocal() {
+   struct timeval t = {0,0};
+   gettimeofday(&t,NULL);
+   return ((unsigned long long)t.tv_sec * 1000000) + t.tv_usec;
+}
 
 void receiveUdpData (int &sock_udp, struct sockaddr_in &my_address, int &msgsock, std::vector<std::string> &telnet_menu, int &curr_pos) {
+  unsigned long long last_time = -1;
   while(1) { //dodać poruszanie strzalkami?
     char buffer[BUFFER_SIZE];
     socklen_t snda_len, rcva_len;
@@ -333,18 +340,20 @@ void receiveUdpData (int &sock_udp, struct sockaddr_in &my_address, int &msgsock
       }
     }
 
-    std::string nth = getUdpHeader("KEEPALIVE", 0);
-    len = nth.size();
+    //czy takie mierzenie tego czasu jest ok?
+    if (gettimelocal() - last_time >= 3500000 || last_time == -1) {
+      last_time = gettimelocal();
+      std::string nth = getUdpHeader("KEEPALIVE", 0);
+      len = nth.size();
 
-    // std::cout << "wysylam " << nth << "\n";
-
-    rcva_len = (socklen_t) sizeof(my_address);
-    snd_len = sendto(sock_udp, nth.data(), nth.size(), 0,
-        (struct sockaddr *) &my_address, rcva_len);
-    if (snd_len != (ssize_t) len) {
-      error("partial / failed write");
+      rcva_len = (socklen_t) sizeof(my_address);
+      snd_len = sendto(sock_udp, nth.data(), nth.size(), 0,
+          (struct sockaddr *) &my_address, rcva_len);
+      if (snd_len != (ssize_t) len) {
+        error("partial / failed write");
+      }
     }
-    // std::cout << "wyslalem\n";
+
 
     (void) memset(buffer, 0, sizeof(buffer));
     len = (size_t) sizeof(buffer) - 1;
