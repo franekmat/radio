@@ -5,6 +5,7 @@
 #include <string>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -181,9 +182,114 @@ void receiveUdpData (int &sock, struct sockaddr_in &my_address) {
     std::cout << tmp;
   }
 }
+static int finish = 0;
+
+/* Obsługa sygnału kończenia */
+static void catch_int (int sig) {
+  finish = 1;
+  fprintf(stderr,
+          "Signal %d catched. No new connections will be accepted.\n", sig);
+}
+
+int newTelnetConnection(int &sock_telnet, int &port_tcp) {
+  struct sockaddr_in server, their_addr;
+  struct sigaction action;
+  sigset_t block_mask;
+
+  sock_telnet = socket(PF_INET, SOCK_STREAM, 0);
+  if (sock_telnet == -1) {
+    error("Opening stream socket");
+  }
+
+  server.sin_family = AF_INET;
+  server.sin_addr.s_addr = htonl(INADDR_ANY);
+  server.sin_port = htons(port_tcp);
+  if (bind(sock_telnet, (struct sockaddr*)&server, (socklen_t)sizeof(server)) == -1) {
+    error("Binding stream socket");
+  }
+
+  if (listen(sock_telnet, 5) == -1) {
+    error("Starting to listen");
+  }
+
+  int sin_size = sizeof( struct sockaddr_in);
+  int msgsock = accept(sock_telnet, (struct sockaddr*) &their_addr, (socklen_t *) &sin_size);
+  if (msgsock == -1) {
+    error("accept");
+  }
+
+  return msgsock;
+}
+
+void writeTelnet(int &msgsock, std::string s) {
+  if (write(msgsock, s.data(), s.size()) == -1) {
+    error("send");
+  }
+}
+
+void writeTelnetMenu(int &msgsock) {
+  std::string clear = "\033[1J\033[H";
+  std::string find_proxy = "Szukaj pośrednika";
+  std::string end_con = "Koniec";
+  std::string pointer = " *";
+  std::string new_line = "\r\n";
+
+  writeTelnet(msgsock, clear);
+  writeTelnet(msgsock, find_proxy + pointer + new_line);
+  writeTelnet(msgsock, end_con + new_line);
+}
+
+void setupTelnet(int &msgsock) {
+  std::string setup = "\377\375\042\377\373\001";
+  writeTelnet(msgsock, setup);
+  writeTelnetMenu(msgsock);
+}
+
+bool arrowUp (char *buf, int len) {
+  if (len == 3 && buf[0] == 27 && buf[1] == 91 && buf[2] == 65) {
+    return true;
+  }
+  return false;
+}
+
+bool arrowDown (char *buf, int len) {
+  if (len == 3 && buf[0] == 27 && buf[1] == 91 && buf[2] == 66) {
+    return true;
+  }
+  return false;
+}
+
+bool enter (char *buf, int len) {
+  if (len == 2 && buf[0] == 13 && buf[1] == 0) {
+    return true;
+  }
+  return false;
+}
+
+void runTelnet(int &msgsock) {
+  while(1) {
+    int buf_size = 16;
+    char buf[buf_size];
+    int len = recv(msgsock, buf, buf_size, 0);
+
+    if (arrowUp(buf, len)) {
+      writeTelnet(msgsock, "\033[1J\033[H");
+      writeTelnet(msgsock, "Szukaj pośrednika *\r\n");
+      writeTelnet(msgsock, "Koniec\r\n");
+    }
+    else if (arrowDown(buf, len)) {
+      writeTelnet(msgsock, "\033[1J\033[H");
+      writeTelnet(msgsock, "Szukaj pośrednika\r\n");
+      writeTelnet(msgsock, "Koniec *\r\n");
+    }
+    else if (enter(buf, len)) {
+
+    }
+  }
+}
 
 int main(int argc, char** argv) {
-  int port_udp = -1, port_tcp = -1, timeout = DEFAULT_TIMEOUT, sock;
+  int port_udp = -1, port_tcp = -1, timeout = DEFAULT_TIMEOUT, sock, sock_telnet;
   std::string host = "";
   struct addrinfo addr_hints, *addr_result = NULL;
   struct sockaddr_in my_address;
@@ -193,6 +299,9 @@ int main(int argc, char** argv) {
   setUdpConnection(sock, host, port_udp, 0, my_address);
 
   receiveUdpData (sock, my_address);
+  // int msgsock = newTelnetConnection(sock_telnet, port_tcp);
+  // setupTelnet(msgsock);
+  // runTelnet(msgsock);
 
   return 0;
 }
