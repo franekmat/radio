@@ -1,31 +1,9 @@
-#include <iostream>
-#include <stdio.h>
-#include <ctype.h>
-#include <stdlib.h>
-#include <string>
-#include <string.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <poll.h>
-#include <deque>
-#include <sys/time.h>
-#include <arpa/inet.h>
-#include <stdexcept>
-#include <algorithm>
-#include "err.h"
 #include "data.h"
+#include "err.h"
 
 #define DEFAULT_TIMEOUT 5
 #define DEFAULT_META "no"
 #define BUFFER_SIZE 2048
-#define DISCOVER 1
-#define IAM 2
-#define KEEPALIVE 3
-#define AUDIO 4
-#define METADATA 6
 
 typedef std::deque <std::pair<struct sockaddr_in, unsigned long long> > ClientsDeque;
 
@@ -121,15 +99,13 @@ bool deleteClient(struct sockaddr_in &client, ClientsDeque &clients) {
 }
 
 std::string getUdpMessage(std::string type, int length, std::string data) {
-  std::string message = "";
-  message += (getUdpHeader(type, length));// + data);
+  std::string message = getUdpHeader(type, length);
 
   if (type == "AUDIO" || type == "METADATA") {
     message += data;
   }
 
   return message;
-  // return data;
 }
 
 void updateClients(int &sock_udp, ClientsDeque &clients, std::string radio_name) {
@@ -157,14 +133,8 @@ void updateClients(int &sock_udp, ClientsDeque &clients, std::string radio_name)
         error("error on sending datagram to client socket");
       }
     }
-    // else if (!deleteClient(client_address, clients)) {
     else {
       deleteClient(client_address, clients);
-      // std::string message = getUdpHeader("IAM", 5) + "RADIO";
-      // ssize_t snd_len = sendto(sock_udp, message.data(), message.size(), 0, (struct sockaddr *) &client_address, rcva_len);
-      // if (snd_len != message.size()) {
-      //   error("error on sending datagram to client socket");
-      // }
       clients.push_back(std::make_pair(client_address, gettimelocal()));
     }
   }
@@ -273,7 +243,6 @@ void setUdpConnection(int &sock, int &port, int timeout) {
     error ("socket");
   }
 
-
   /* setsockopt: Handy debugging trick that lets
    * us rerun the server immediately after we kill it;
    * otherwise we have to wait about 20 secs.
@@ -345,8 +314,11 @@ void readDataWithoutMeta(int &sock, int &sock_udp, std::string &buffer, int time
   }
 }
 
-/* I know that buffer is not empty */
 void readMeta (int &sock, int &sock_udp, std::string &buffer, int timeout, ClientsDeque &clients, std::string radio_name) {
+  if (buffer.empty()) {
+    return;
+  }
+
   int size = getMetaSize(buffer);
   buffer.erase(0, 1);
 
@@ -370,7 +342,6 @@ void readMeta (int &sock, int &sock_udp, std::string &buffer, int timeout, Clien
     }
   }
 
-  // std::cerr << "usuwam " << size << "\n";
   printMeta(buffer.substr(0, size), sock_udp, clients, radio_name);
   buffer.erase(0, size);
 }
@@ -389,12 +360,10 @@ void readDataWithMeta(int &sock, int &sock_udp, std::string &buffer, int size, i
 
     if (buffer.size() <= counter) {
       counter -= buffer.size();
-      // std::cerr << buffer.size() << "<\n";
       printData(buffer, sock_udp, clients, radio_name);
       buffer = "";
     }
     else {
-      // std::cerr << counter << "\n";
       printData(buffer.substr(0, counter), sock_udp, clients, radio_name);
       buffer.erase(0, counter);
       readMeta(sock, sock_udp, buffer, timeout, clients, radio_name);
@@ -418,8 +387,6 @@ void handleResponse(int &sock, int &sock_udp, std::string &meta, int timeout, Cl
   if (containsMeta(header)) {
     metaIntVal = getMetaInt(header);
   }
-
-  // std::cerr << "metaint = " << metaIntVal << "\n";
 
   if (metaIntVal == -1) {
     readDataWithoutMeta(sock, sock_udp, buffer, timeout, clients, radio_name);

@@ -1,20 +1,3 @@
-#include <iostream>
-#include <stdio.h>
-#include <ctype.h>
-#include <stdlib.h>
-#include <string>
-#include <string.h>
-#include <unistd.h>
-#include <signal.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <poll.h>
-#include <stdexcept>
-#include <vector>
-#include <algorithm>
-#include <sys/time.h>
 #include "telnetmenu.h"
 #include "data.h"
 #include "err.h"
@@ -199,7 +182,7 @@ void runClient (int &sock_udp, struct sockaddr_in &my_address, TelnetMenu *&menu
     tmp.resize(BUFFER_SIZE);
     if (poll(fds2, 1, timeout * 1000) == 0) {
       menu->deleteRadio(radio_pos);
-      return;
+      runClient (sock_udp, my_address, menu, timeout, -1); // na pewno ok??
     }
     rcv_len = recvfrom(sock_udp, &tmp[0], len, 0, (struct sockaddr *) &srvr_address, &rcva_len);
     if (rcv_len < 0) {
@@ -214,7 +197,6 @@ void runClient (int &sock_udp, struct sockaddr_in &my_address, TelnetMenu *&menu
     std::string type = getType(bytesToInt(tmp[0], tmp[1]));
     int leng = bytesToInt(tmp[2], tmp[3]);
     tmp.erase(0, 4);
-
 
     if (type == "AUDIO") {
       std::cout << tmp;
