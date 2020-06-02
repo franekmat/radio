@@ -1,14 +1,13 @@
-TARGET: radio-proxy
+CC = g++
+CFLAGS = -O2 -Wall -std=c++11
 
-CC	= cc
-CFLAGS	= -Wall -O2
-LFLAGS	= -Wall
+all: radio-proxy radio-client
 
-radio-proxy.o err.o: err.h
+radio-proxy: radio-proxy.cpp
+	$(CC) $(CFLAGS) -o radio-proxy radio-proxy.cpp
 
-radio-proxy: radio-proxy.o err.o
-	$(CC) $(LFLAGS) $^ -o $@
+radio-client: radio-client.cpp
+	$(CC) $(CFLAGS) -o radio-client radio-client.cpp
 
-.PHONY: clean TARGET
 clean:
-	rm -f radio-proxy *.o *~ *.bak *.conf
+	rm radio-proxy radio-client

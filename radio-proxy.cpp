@@ -16,6 +16,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include "err.h"
+#include "data.h"
 
 #define DEFAULT_TIMEOUT 5
 #define DEFAULT_META "no"
@@ -35,79 +36,6 @@ typedef std::deque <std::pair<struct sockaddr_in, unsigned long long> > ClientsD
    ACTIVATE_CLIENTS = true, gdy jest -P
 */
 bool ACTIVATE_CLIENTS = false;
-
-void error(std::string err_msg)
-{
-  const char *err_message = err_msg.c_str();
-  perror(err_message);
-  exit(1);
-}
-
-void checkHostName (std::string host) {
-  //check if proper value
-}
-
-void checkResource (std::string resource) {
-  //check if proper value
-}
-
-void checkMulti (std::string multi) {
-  //check if proper value
-}
-
-bool containsOnlyDigits (std::string s) {
-  /* I want to ignore leading and trailing spaces */
-  int l = 0, p = s.size() - 1;
-  while (l < s.size() && s[l] == ' ') {
-    l++;
-  }
-  while (p >= 0 && s[p] == ' ') {
-    p--;
-  }
-  /* now check if number contains something other than digit characters */
-  for (int i = l; i <= p; i++) {
-    if (s[i] < '0' || s[i] > '9') {
-      return false;
-    }
-  }
-  return true;
-}
-
-int getValueFromString (std::string value, std::string whatsthat) {
-  if (!containsOnlyDigits(value)) {
-    std::string err_msg = "Invalid " + whatsthat + " number";
-    error(err_msg);
-  }
-  int ret_val;
-  try {
-    ret_val = std::stoi(value);
-  }
-  catch (std::invalid_argument const &e) {
-		error("Bad input: std::invalid_argument thrown");
-	}
-	catch (std::out_of_range const &e) {
-		error("Integer overflow: std::out_of_range thrown");
-	}
-  return ret_val;
-}
-
-void checkPort (std::string port) {
-  if (0) {
-    error("Invalid port number");
-  }
-}
-
-void checkMeta (std::string meta) {
-  if (meta != "yes" && meta != "no") {
-    error ("Wrong format of meta argument");
-  }
-}
-
-void checkTimeout (std::string timeout) {
-  if (0) {
-    error("Invalid timeout number");
-  }
-}
 
 void printUsageError(std::string name) {
   std::string err_msg = "Usage: " + name + " -h host -r resource -p port -m yes|no -t timeout -P port -B multi -T timeout";
@@ -181,39 +109,6 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
   }
 }
 
-unsigned long long gettimelocal() {
-   struct timeval t = {0,0};
-   gettimeofday(&t,NULL);
-   return ((unsigned long long)t.tv_sec * 1000000) + t.tv_usec;
-}
-
-int bytesToInt (char b1, char b2) {
-  int res = 0;
-  res <<= 8;
-  res |= b1;
-  res <<= 8;
-  res |= b2;
-  return res;
-}
-
-std::string getType (int n) {
-  if (n == 1) {
-    return "DISCOVER";
-  }
-  else if (n == 2) {
-    return "IAM";
-  }
-  else if (n == 3) {
-    return "KEEPALIVE";
-  }
-  else if (n == 4) {
-    return "AUDIO";
-  }
-  else {
-    return "METADATA";
-  }
-}
-
 bool deleteClient(struct sockaddr_in &client, ClientsDeque &clients) {
   for (int i = 0; i < clients.size(); i++) {
     if (clients[i].first.sin_addr.s_addr == client.sin_addr.s_addr &&
@@ -223,32 +118,6 @@ bool deleteClient(struct sockaddr_in &client, ClientsDeque &clients) {
     }
   }
   return false;
-}
-
-std::string getUdpHeader (std::string type, int length) {
-  std::string res = "";
-  int n;
-  if (type == "DISCOVER") {
-    n = 1;
-  }
-  else if (type == "IAM") {
-    n = 2;
-  }
-  else if (type == "KEEPALIVE") {
-    n = 3;
-  }
-  else if (type == "AUDIO") {
-    n = 4;
-  }
-  else if (type == "METADATA") {
-    n = 6;
-  }
-  res += (char)((n >> 8) & 0xFF);
-  res += (char)(n & 0xFF);
-  res += (char)((length >> 8) & 0xFF);
-  res += (char)(length & 0xFF);
-
-  return res;
 }
 
 std::string getUdpMessage(std::string type, int length, std::string data) {
@@ -265,8 +134,6 @@ std::string getUdpMessage(std::string type, int length, std::string data) {
 
 void updateClients(int &sock_udp, ClientsDeque &clients, std::string radio_name) {
   struct sockaddr_in client_address;
-  struct hostent *hostp;
-  char *hostaddrp;
   socklen_t rcva_len;
   ssize_t len = 1;
   char buffer[BUFFER_SIZE];
@@ -305,7 +172,7 @@ void updateClients(int &sock_udp, ClientsDeque &clients, std::string radio_name)
 
 void sendUdpMessage(int &sock_udp, std::string message, ClientsDeque &clients) {
   unsigned long long current_time = gettimelocal();
-  ssize_t snd_len, len = message.size();
+  ssize_t snd_len;
   socklen_t snda_len;
   struct sockaddr_in client_address;
   for (auto client : clients) {
@@ -400,7 +267,6 @@ void setTcpConnection(int &sock, std::string &host, int &port) {
 
 void setUdpConnection(int &sock, int &port, int timeout) {
   struct sockaddr_in server_address;
-	struct sockaddr_in client_address;
 
   sock = socket(AF_INET, SOCK_DGRAM, 0); // creating IPv4 UDP socket
 	if (sock < 0) {
@@ -434,47 +300,6 @@ void sendRequest(int &sock, std::string &message) {
   if (write(sock, message.c_str(), len) != len) {
     printf("partial / failed write");
   }
-}
-
-/* check if received header contains icy-metaint */
-bool containsMeta (std::string header) {
-  return (header.find("icy-metaint:") != std::string::npos);
-}
-
-/* get icy-metaint value from header */
-int getMetaInt (std::string header) {
-  std::size_t found = header.find("icy-metaint:");
-  header.erase(0, found + strlen("icy-metaint:"));
-  std::string value = header.substr(0, header.find("\r\n"));
-  return getValueFromString(value, "metaint");
-}
-
-/* get radio name from header */
-std::string getMetaName (std::string header) {
-  std::size_t found = header.find("icy-name:");
-  header.erase(0, found + strlen("icy-name:"));
-  return header.substr(0, header.find("\r\n"));
-}
-
-bool containsEndOfHeader(std::string &buffer) {
-  return (buffer.find("\r\n\r\n") != std::string::npos);
-}
-
-std::string getStatus (std::string &header) {
-  std::size_t found = header.find("\r\n");
-  return header.substr(0, found);
-}
-
-bool okStatus (std::string &status) {
-  return (status == "HTTP/1.0 200 OK" || status == "HTTP/1.1 200 OK" || status == "ICY 200 OK");
-}
-
-/* cut header from buffer and return header */
-std::string getHeader(std::string &buffer) {
-  std::size_t found = buffer.find("\r\n\r\n");
-  std::string header = buffer.substr(0, found);
-  buffer.erase(0, found + strlen("\r\n\r\n"));
-  return header;
 }
 
 /* read and return rcv_len */
@@ -518,14 +343,6 @@ void readDataWithoutMeta(int &sock, int &sock_udp, std::string &buffer, int time
     rcv_len = readTCP(sock, buffer, timeout);
     printData(buffer, sock_udp, clients, radio_name);
   }
-}
-
-
-int getMetaSize(std::string &buffer) {
-  if (buffer.empty()) {
-    error("Cannot get size of meta from empty buffer");
-  }
-  return (int)buffer[0] * 16;
 }
 
 /* I know that buffer is not empty */
@@ -615,8 +432,6 @@ void handleResponse(int &sock, int &sock_udp, std::string &meta, int timeout, Cl
   }
 }
 
-// void handleClients()
-
 int main(int argc, char** argv) {
   /* for A part of the task */
   int port = -1, timeout = DEFAULT_TIMEOUT, sock;
@@ -627,6 +442,7 @@ int main(int argc, char** argv) {
   ClientsDeque clients;
 
   parseInput(argc, argv, host, resource, port, meta, timeout, port_clients, timeout_clients, multi);
+
   setTcpConnection(sock, host, port);
   setUdpConnection(sock_udp, port_clients, timeout_clients);
 
