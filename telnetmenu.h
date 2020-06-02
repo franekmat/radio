@@ -105,7 +105,7 @@ public:
   void writeTelnetMenu() {
     writeTelnet(CLEAR);
     for (int i = 0; i < telnet_menu.size(); i++) {
-      std::string s = " " + telnet_menu[i];
+      std::string s = telnet_menu[i];
       if (i == playing_pos) {
         s += POINTER;
       }

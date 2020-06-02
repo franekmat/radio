@@ -101,12 +101,22 @@ unsigned long long gettimelocal() {
    return ((unsigned long long)t.tv_sec * 1000000) + t.tv_usec;
 }
 
+//https://stackoverflow.com/questions/5585532/c-int-to-byte-array/43515755#43515755
 int bytesToInt (char b1, char b2) {
   int res = 0;
   res <<= 8;
   res |= b1;
   res <<= 8;
   res |= b2;
+  return ntohs(res);
+}
+
+//https://stackoverflow.com/questions/5585532/c-int-to-byte-array/43515755#43515755
+std::string intToBytes (int x) {
+  std::string res = "";
+  x = htons(x);
+  res += (char)((x >> 8) & 0xFF);
+  res += (char)(x & 0xFF);
   return res;
 }
 
@@ -177,29 +187,21 @@ int getMetaSize(std::string &buffer) {
 }
 
 std::string getUdpHeader (std::string type, int length) {
-  std::string res = "";
-  int n;
   if (type == "DISCOVER") {
-    n = 1;
+    return intToBytes(1) + intToBytes(length);
   }
   else if (type == "IAM") {
-    n = 2;
+    return intToBytes(2) + intToBytes(length);
   }
   else if (type == "KEEPALIVE") {
-    n = 3;
+    return intToBytes(3) + intToBytes(length);
   }
   else if (type == "AUDIO") {
-    n = 4;
+    return intToBytes(4) + intToBytes(length);
   }
   else {
-    n = 6;
+    return intToBytes(6) + intToBytes(length);
   }
-  res += (char)((n >> 8) & 0xFF);
-  res += (char)(n & 0xFF);
-  res += (char)((length >> 8) & 0xFF);
-  res += (char)(length & 0xFF);
-
-  return res;
 }
 
 #endif //DATA_H

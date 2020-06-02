@@ -133,10 +133,10 @@ void updateClients(int &sock_udp, ClientsDeque &clients, std::string radio_name)
         error("error on sending datagram to client socket");
       }
     }
-    else {
+    // else {
       deleteClient(client_address, clients);
       clients.push_back(std::make_pair(client_address, gettimelocal()));
-    }
+    // }
   }
 }
 
