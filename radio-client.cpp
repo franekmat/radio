@@ -116,39 +116,40 @@ void sendKeepAlive(int &sock_udp, struct sockaddr_in &my_address, int &last_time
 }
 
 void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos) {
-  char buffer[BUFFER_SIZE + HEADER_SIZE];
-  (void) memset(buffer, 0, sizeof(buffer));
   struct sockaddr_in srvr_address;
-  ssize_t rcv_len, len = (size_t) sizeof(buffer) - 1;
+  ssize_t rcv_len;
   socklen_t rcva_len = (socklen_t) sizeof(srvr_address);
-  std::string tmp;
-  struct pollfd fds2[1] = {{sock_udp, 0 | POLLIN}};
+  std::string buffer;
+  struct pollfd fds[1] = {{sock_udp, 0 | POLLIN}};
 
-  tmp.resize(BUFFER_SIZE + HEADER_SIZE);
-  if (poll(fds2, 1, timeout * 1000) == 0) {
+  buffer.resize(BUFFER_SIZE + HEADER_SIZE);
+  if (poll(fds, 1, timeout * 1000) == 0) {
     menu->deleteRadio(radio_pos);
     radio_pos = -1;
     return;
   }
-  rcv_len = recvfrom(sock_udp, &tmp[0], len, 0, (struct sockaddr *) &srvr_address, &rcva_len);
+  rcv_len = recvfrom(sock_udp, &buffer[0], buffer.size(), 0, (struct sockaddr *) &srvr_address, &rcva_len);
   if (rcv_len < 0) {
     error("read");
   }
-  tmp.resize(rcv_len);
-  if (rcv_len < 4) {
-    error("wrong size of rcv_len");
+  buffer.resize(rcv_len);
+
+  if (!checkReceivedMessage(buffer, rcv_len)) {
+    return receiveStream(sock_udp, menu, timeout, radio_pos);
   }
-  std::string type = getType(bytesToInt(tmp[0], tmp[1]));
-  int leng = bytesToInt(tmp[2], tmp[3]);
-  tmp.erase(0, 4);
+
+  std::string type = getType(bytesToInt(buffer[0], buffer[1]));
+  int leng = bytesToInt(buffer[2], buffer[3]);
+  buffer.erase(0, 4);
+
   if (type == "AUDIO") {
-    std::cout << tmp;
+    std::cout << buffer;
   }
   else if (type == "METADATA") {
-    menu->changeMeta(tmp);
+    menu->changeMeta(buffer);
   }
   else if (type == "IAM") {
-    menu->addRadio(tmp);
+    menu->addRadio(buffer);
   }
 }
 

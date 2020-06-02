@@ -133,8 +133,11 @@ std::string getType (int n) {
   else if (n == 4) {
     return "AUDIO";
   }
-  else {
+  else if (n == 6) {
     return "METADATA";
+  }
+  else {
+    error("Incorrect type of data");
   }
 }
 
@@ -199,9 +202,21 @@ std::string getUdpHeader (std::string type, int length) {
   else if (type == "AUDIO") {
     return intToBytes(4) + intToBytes(length);
   }
-  else {
+  else if (type == "METADATA") {
     return intToBytes(6) + intToBytes(length);
   }
+  else {
+    error ("Incorrect type of data");
+  }
+}
+
+bool checkReceivedMessage(std::string buffer, int len) {
+  if (buffer.size() < 4) {
+    return false;
+  }
+  std::string type = getType(bytesToInt(buffer[0], buffer[1]));
+  int length = bytesToInt(buffer[2], buffer[3]);
+  return length == len - 4;
 }
 
 #endif //DATA_H

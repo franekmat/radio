@@ -113,7 +113,8 @@ void updateClients(int &sock_udp, ClientsDeque &clients, std::string radio_name)
   struct sockaddr_in client_address;
   socklen_t rcva_len;
   ssize_t len = 1;
-  char buffer[BUFFER_SIZE];
+  std::string buffer;
+  buffer.resize(BUFFER_SIZE + HEADER_SIZE);
   struct pollfd fds[1] = {{sock_udp, 0 | POLLIN}};
 
 
@@ -122,9 +123,14 @@ void updateClients(int &sock_udp, ClientsDeque &clients, std::string radio_name)
     if (poll(fds, 1, 100) == 0) {
       break;
     }
-    len = recvfrom(sock_udp, buffer, sizeof(buffer), 0, (struct sockaddr *) &client_address, &rcva_len);
+    len = recvfrom(sock_udp, &buffer[0], buffer.size(), 0, (struct sockaddr *) &client_address, &rcva_len);
     if (len < 0) {
       error("error on datagram from client socket");
+    }
+    buffer.resize(len);
+
+    if (!checkReceivedMessage(buffer, len)) {
+      continue;
     }
 
     if (getType(bytesToInt(buffer[0], buffer[1])) == "DISCOVER") {
