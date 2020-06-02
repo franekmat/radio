@@ -84,6 +84,9 @@ void setUdpConnection(int &sock, std::string host, int &port, int timeout, struc
   if (sock < 0) {
     error("socket");
   }
+
+  int optval = 1;
+  setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (const void *)&optval , sizeof(int));
 }
 
 void searchProxy(int &sock_udp, struct sockaddr_in &my_address) {

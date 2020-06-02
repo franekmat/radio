@@ -249,8 +249,7 @@ void setUdpConnection(int &sock, int &port, int timeout) {
    * Eliminates "ERROR on binding: Address already in use" error.
    */
   int optval = 1;
-  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
-	     (const void *)&optval , sizeof(int));
+  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval , sizeof(int));
 
 
   // bzero((char *) &server_address, sizeof(server_address)); // ????
