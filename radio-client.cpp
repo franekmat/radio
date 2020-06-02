@@ -135,75 +135,74 @@ void searchProxy (int &sock_udp, struct sockaddr_in &my_address, TelnetMenu *&me
   }
 }
 
-void runClient (int &sock_udp, struct sockaddr_in &my_address, TelnetMenu *&menu, int timeout, int radio_pos) {
-  unsigned long long last_time = -1;
-  while(1) {
-    char buffer[BUFFER_SIZE];
-    socklen_t rcva_len;
-  	ssize_t len, snd_len, rcv_len;
-    struct sockaddr_in srvr_address;
+void runClient (int &sock_udp, struct sockaddr_in &my_address, TelnetMenu *&menu, int timeout, int &last_time, int &radio_pos) {
+  char buffer[BUFFER_SIZE];
+  socklen_t rcva_len;
+  ssize_t len, snd_len, rcv_len;
+  struct sockaddr_in srvr_address;
 
-    int action = menu->runTelnet(10);
-    /* akcja równa 1 oznacza, że ktoś wybrał w menu szukanie pośrednika */
-    if (action == 1) {
-      searchProxy(sock_udp, my_address, menu);
+  int action = menu->runTelnet(10);
+  /* akcja równa 1 oznacza, że ktoś wybrał w menu szukanie pośrednika */
+  if (action == 1) {
+    searchProxy(sock_udp, my_address, menu);
+  }
+  /* akcja równa 2 oznacza, że ktoś wybrał w menu radio do odtwarzania */
+  else if (action == 2) {
+    // return runClient (sock_udp, my_address, menu, timeout, menu->getCurrPos());
+    radio_pos = menu->getCurrPos();
+  }
+
+  //nic nie odtwarzamy, wiec nikomu nie wysylamy keepalive (czy aby na pewno?)
+  if (radio_pos < 0) {
+    return;
+  }
+
+  //czy takie mierzenie tego czasu jest ok?
+  if (gettimelocal() - last_time >= 3500000 || last_time == -1) {
+    last_time = gettimelocal();
+    std::string nth = getUdpHeader("KEEPALIVE", 0);
+    len = nth.size();
+
+    rcva_len = (socklen_t) sizeof(my_address);
+    snd_len = sendto(sock_udp, nth.data(), nth.size(), 0, (struct sockaddr *) &my_address, rcva_len);
+    if (snd_len != (ssize_t) len) {
+      error("partial / failed write");
     }
-    /* akcja równa 2 oznacza, że ktoś wybrał w menu radio do odtwarzania */
-    else if (action == 2) {
-      return runClient (sock_udp, my_address, menu, timeout, menu->getCurrPos());
-    }
+  }
 
-    //nic nie odtwarzamy, wiec nikomu nie wysylamy keepalive (czy aby na pewno?)
-    if (radio_pos < 0) {
-      continue;
-    }
+  (void) memset(buffer, 0, sizeof(buffer));
+  len = (size_t) sizeof(buffer) - 1;
+  rcva_len = (socklen_t) sizeof(srvr_address);
 
-    //czy takie mierzenie tego czasu jest ok?
-    if (gettimelocal() - last_time >= 3500000 || last_time == -1) {
-      last_time = gettimelocal();
-      std::string nth = getUdpHeader("KEEPALIVE", 0);
-      len = nth.size();
+  std::string tmp;
+  struct pollfd fds2[1] = {{sock_udp, 0 | POLLIN}};
 
-      rcva_len = (socklen_t) sizeof(my_address);
-      snd_len = sendto(sock_udp, nth.data(), nth.size(), 0,
-          (struct sockaddr *) &my_address, rcva_len);
-      if (snd_len != (ssize_t) len) {
-        error("partial / failed write");
-      }
-    }
+  tmp.resize(BUFFER_SIZE);
+  if (poll(fds2, 1, timeout * 1000) == 0) {
+    menu->deleteRadio(radio_pos);
+    // runClient (sock_udp, my_address, menu, timeout, -1); // na pewno ok??
+    radio_pos = -1;
+    return; //tak też ok??
+  }
+  rcv_len = recvfrom(sock_udp, &tmp[0], len, 0, (struct sockaddr *) &srvr_address, &rcva_len);
+  if (rcv_len < 0) {
+    error("read");
+  }
+  tmp.resize(rcv_len);
 
-    (void) memset(buffer, 0, sizeof(buffer));
-    len = (size_t) sizeof(buffer) - 1;
-    rcva_len = (socklen_t) sizeof(srvr_address);
+  if (rcv_len < 4) {
+    error("wrong size of rcv_len");
+  }
 
-    std::string tmp;
-    struct pollfd fds2[1] = {{sock_udp, 0 | POLLIN}};
+  std::string type = getType(bytesToInt(tmp[0], tmp[1]));
+  int leng = bytesToInt(tmp[2], tmp[3]);
+  tmp.erase(0, 4);
 
-    tmp.resize(BUFFER_SIZE);
-    if (poll(fds2, 1, timeout * 1000) == 0) {
-      menu->deleteRadio(radio_pos);
-      runClient (sock_udp, my_address, menu, timeout, -1); // na pewno ok??
-    }
-    rcv_len = recvfrom(sock_udp, &tmp[0], len, 0, (struct sockaddr *) &srvr_address, &rcva_len);
-    if (rcv_len < 0) {
-      error("read");
-    }
-    tmp.resize(rcv_len);
-
-    if (rcv_len < 4) {
-      error("wrong size of rcv_len");
-    }
-
-    std::string type = getType(bytesToInt(tmp[0], tmp[1]));
-    int leng = bytesToInt(tmp[2], tmp[3]);
-    tmp.erase(0, 4);
-
-    if (type == "AUDIO") {
-      std::cout << tmp;
-    }
-    else if (type == "METADATA") {
-      menu->changeMeta(tmp);
-    }
+  if (type == "AUDIO") {
+    std::cout << tmp;
+  }
+  else if (type == "METADATA") {
+    menu->changeMeta(tmp);
   }
 }
 
@@ -221,7 +220,10 @@ int main(int argc, char** argv) {
   menu->addClient(sock_telnet);
   menu->setupTelnet();
 
-  runClient(sock, my_address, menu, timeout, -1);
+  int last_keepalive_time = -1, radio_pos = -1;
+  while (1) {
+    runClient(sock, my_address, menu, timeout, last_keepalive_time, radio_pos);
+  }
 
   return 0;
 }
