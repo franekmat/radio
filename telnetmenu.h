@@ -148,11 +148,22 @@ public:
     writeTelnetMenu();
   }
 
+  std::string getTitleFromMeta(std::string meta) {
+    if (meta.substr(0, 13) == "StreamTitle='") {
+      std::string res = "";
+      for (int i = 13; i < meta.size() && meta[i] != '\''; i++) {
+        res += meta[i];
+      }
+      return res;
+    }
+    return meta;
+  }
+
   void changeMeta(std::string s) {
     if (telnet_menu.back() != "Koniec") {
       telnet_menu.pop_back();
     }
-    telnet_menu.push_back(s);
+    telnet_menu.push_back(getTitleFromMeta(s));
     curr_pos = 0;
     writeTelnetMenu();
   }
