@@ -5,6 +5,7 @@
 #define DEFAULT_TIMEOUT 5
 #define DEFAULT_META "no"
 #define BUFFER_SIZE 2048
+#define HEADER_SIZE 4
 
 void printUsageError(std::string name) {
   std::string err_msg = "Usage: " + name + " -H host -P port -p port -T timeout";
@@ -115,7 +116,7 @@ void sendKeepAlive(int &sock_udp, struct sockaddr_in &my_address, int &last_time
 }
 
 void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos) {
-  char buffer[BUFFER_SIZE];
+  char buffer[BUFFER_SIZE + HEADER_SIZE];
   (void) memset(buffer, 0, sizeof(buffer));
   struct sockaddr_in srvr_address;
   ssize_t rcv_len, len = (size_t) sizeof(buffer) - 1;
@@ -123,7 +124,7 @@ void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos
   std::string tmp;
   struct pollfd fds2[1] = {{sock_udp, 0 | POLLIN}};
 
-  tmp.resize(BUFFER_SIZE);
+  tmp.resize(BUFFER_SIZE + HEADER_SIZE);
   if (poll(fds2, 1, timeout * 1000) == 0) {
     menu->deleteRadio(radio_pos);
     radio_pos = -1;

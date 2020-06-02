@@ -4,6 +4,7 @@
 #define DEFAULT_TIMEOUT 5
 #define DEFAULT_META "no"
 #define BUFFER_SIZE 2048
+#define HEADER_SIZE 4
 
 typedef std::deque <std::pair<struct sockaddr_in, unsigned long long> > ClientsDeque;
 
@@ -150,18 +151,9 @@ void sendUdpMessage(int &sock_udp, std::string message, ClientsDeque &clients) {
     if (current_time - client.second < 5000000) {
       std::cout << "sending " << message.size() << " to " << client.first.sin_port << "\n";
       client_address = client.first;
-      std::string tmp_message = message;
-      while (!tmp_message.empty()) {
-        std::string mess = tmp_message.substr(0, std::min((int)tmp_message.size(), BUFFER_SIZE - 1));
-        snd_len = sendto(sock_udp, mess.data(), mess.size(), 0, (struct sockaddr *) &client_address, snda_len);
-        if (snd_len != mess.size()) {
-          error("error on sending datagram to client socket");
-        }
-        tmp_message.erase(4, mess.size() - 4);
-
-        if (tmp_message.size() == 4) {
-          break;
-        }
+      snd_len = sendto(sock_udp, message.data(), message.size(), 0, (struct sockaddr *) &client_address, snda_len);
+      if (snd_len != message.size()) {
+        error("error on sending datagram to client socket");
       }
     }
   }
@@ -351,8 +343,7 @@ void readDataWithMeta(int &sock, int &sock_udp, std::string &buffer, int size, i
   ssize_t rcv_len = 1;
 
   while (rcv_len > 0 || !buffer.empty()) {
-    // i do not have yet buffer filled with data
-    if (buffer.size() < counter || counter == 0) {
+    if (buffer.empty()) {
       rcv_len = readTCP(sock, tmp, timeout);
       buffer += tmp;
     }
@@ -360,7 +351,7 @@ void readDataWithMeta(int &sock, int &sock_udp, std::string &buffer, int size, i
     if (buffer.size() <= counter) {
       counter -= buffer.size();
       printData(buffer, sock_udp, clients, radio_name);
-      buffer = "";
+      buffer.clear();
     }
     else {
       printData(buffer.substr(0, counter), sock_udp, clients, radio_name);
