@@ -182,7 +182,7 @@ public:
         if (curr_pos == 0) {
           return 1;
         }
-        else if (curr_pos == (int) telnet_menu.size() - 1) {
+        else if (curr_pos < telnet_menu.size() && telnet_menu[curr_pos] == "Koniec") {
           if (close(msgsock) < 0) {
             error("Closing socket");
           }
