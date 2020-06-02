@@ -29,7 +29,7 @@ private:
   const std::string NEW_LINE = "\r\n";
 
   std::vector<std::string> telnet_menu;
-  int port, msgsock, curr_pos = 0;
+  int port, msgsock, curr_pos = 0, playing_pos = -1;
   struct sockaddr_in server;
 
   bool arrowUp (char *buf, int len) {
@@ -92,6 +92,10 @@ public:
     }
   }
 
+  void writeCursor(int pos) {
+    writeTelnet("\033[" + std::to_string(pos + 1) + ";1H");
+  }
+
   void setupTelnetMenu () {
     telnet_menu.clear();
     telnet_menu.push_back("Szukaj pośrednika");
@@ -101,13 +105,13 @@ public:
   void writeTelnetMenu() {
     writeTelnet(CLEAR);
     for (int i = 0; i < telnet_menu.size(); i++) {
-      if (i != curr_pos) {
-        writeTelnet(telnet_menu[i] + NEW_LINE);
+      std::string s = " " + telnet_menu[i];
+      if (i == playing_pos) {
+        s += POINTER;
       }
-      else {
-        writeTelnet(telnet_menu[i] + POINTER + NEW_LINE);
-      }
+      writeTelnet(s + NEW_LINE);
     }
+    writeCursor(curr_pos);
   }
 
   void setupTelnet() {
@@ -137,6 +141,11 @@ public:
 
   int getCurrPos() {
     return curr_pos;
+  }
+
+  void setPlayingPos(int pos) {
+    playing_pos = pos;
+    writeTelnetMenu();
   }
 
   void changeMeta(std::string s) {

@@ -11,6 +11,7 @@ void printUsageError(std::string name) {
   error(err_msg);
 }
 
+
 void parseInput(int argc, char **argv, std::string &host, int &port_udp, int &port_tcp, int &timeout) {
   int opt;
   bool host_inp = false, port_udp_inp = false, port_tcp_inp = false;
@@ -158,6 +159,7 @@ void runClient (int &sock_udp, struct sockaddr_in &my_address, TelnetMenu *&menu
   else if (action == 2) {
     // return runClient (sock_udp, my_address, menu, timeout, menu->getCurrPos());
     radio_pos = menu->getCurrPos();
+    menu->setPlayingPos(radio_pos);
   }
   //nic nie odtwarzamy, wiec nikomu nie wysylamy keepalive (czy aby na pewno?)
   if (radio_pos < 0) {
