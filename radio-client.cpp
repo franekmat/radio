@@ -7,12 +7,15 @@
 #define BUFFER_SIZE 2048
 #define HEADER_SIZE 4
 
+// function, which prints proper usage of the 'name' program
 void printUsageError(std::string name) {
   std::string err_msg = "Usage: " + name + " -H host -P port -p port -T timeout";
   error(err_msg);
 }
 
-
+// parsing input arguments, checking whether they are proper
+// (for example, port number can not contains other characters than digits),
+// and then saving them
 void parseInput(int argc, char **argv, std::string &host, int &port_udp, int &port_tcp, int &timeout) {
   int opt;
   bool host_inp = false, port_udp_inp = false, port_tcp_inp = false;
@@ -57,6 +60,7 @@ void parseInput(int argc, char **argv, std::string &host, int &port_udp, int &po
   }
 }
 
+// set UDP connection, which will be used to communicate with radio-proxy programs
 void setUdpConnection(int &sock, std::string host, int &port, int timeout, struct sockaddr_in &my_address) {
   struct addrinfo addr_hints;
   struct addrinfo *addr_result;
@@ -86,10 +90,12 @@ void setUdpConnection(int &sock, std::string host, int &port, int timeout, struc
     error("socket");
   }
 
+  // activate broadcast option
   int optval = 1;
   setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (const void *)&optval , sizeof(int));
 }
 
+// send DISCOVER message to radio-proxy programs via UDP
 void searchProxy(int &sock_udp, struct sockaddr_in &my_address) {
   std::string mess = getUdpHeader("DISCOVER", 0);
   ssize_t len = mess.size();
@@ -101,20 +107,20 @@ void searchProxy(int &sock_udp, struct sockaddr_in &my_address) {
   }
 }
 
+// send KEEPALIVE message to radio-proxy programs and save time when that happens
 void sendKeepAlive(int &sock_udp, struct sockaddr_in &my_address, int &last_time) {
   last_time = gettimelocal();
   std::string nth = getUdpHeader("KEEPALIVE", 0);
-  socklen_t rcva_len;
-  ssize_t len, snd_len;
-  len = nth.size();
+  ssize_t len = nth.size();
 
-  rcva_len = (socklen_t) sizeof(my_address);
-  snd_len = sendto(sock_udp, nth.data(), nth.size(), 0, (struct sockaddr *) &my_address, rcva_len);
+  socklen_t rcva_len = (socklen_t) sizeof(my_address);
+  ssize_t snd_len = sendto(sock_udp, nth.data(), nth.size(), 0, (struct sockaddr *) &my_address, rcva_len);
   if (snd_len != (ssize_t) len) {
     error("partial / failed write");
   }
 }
 
+// receive response from the radio-proxy: AUDIO, METADATA or IAM
 void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos) {
   struct sockaddr_in srvr_address;
   ssize_t rcv_len;
@@ -134,6 +140,7 @@ void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos
   }
   buffer.resize(rcv_len);
 
+  // check whether message is valid
   if (!checkReceivedMessage(buffer, rcv_len)) {
     return receiveStream(sock_udp, menu, timeout, radio_pos);
   }
@@ -153,6 +160,8 @@ void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos
   }
 }
 
+// function that detects actions on the telnet menu, receive stream from
+// the radio-proxy and send them KEEPALIVE messages
 void runClient (int &sock_udp, struct sockaddr_in &my_address, TelnetMenu *&menu, int timeout, int &last_time, int &radio_pos) {
   int action = menu->runTelnet(10);
   /* akcja równa 1 oznacza, że ktoś wybrał w menu szukanie pośrednika */
