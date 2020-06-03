@@ -1,12 +1,7 @@
 #ifndef TELNETMENU_H
 #define TELNETMENU_H
 
-#include <iostream>
-#include <stdio.h>
-#include <ctype.h>
-#include <stdlib.h>
 #include <string>
-#include <string.h>
 #include <unistd.h>
 #include <signal.h>
 #include <sys/types.h>
@@ -16,8 +11,6 @@
 #include <poll.h>
 #include <stdexcept>
 #include <vector>
-#include <algorithm>
-#include <sys/time.h>
 #include "err.h"
 
 class TelnetMenu {
