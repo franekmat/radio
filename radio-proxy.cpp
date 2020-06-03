@@ -392,8 +392,8 @@ int main(int argc, char** argv) {
 
   parseInput(argc, argv, host, resource, port, meta, timeout, port_clients, timeout_clients, multi);
 
-  setTcpConnection(sock, host, port);
-  setUdpConnection(sock_udp, port_clients);
+  setTcpClientConnection(sock, host, port);
+  setUdpServerConnection(sock_udp, port_clients);
 
   std::string message = setRequest(host, resource, meta);
   sendRequest(sock, message);

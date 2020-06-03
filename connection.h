@@ -2,7 +2,7 @@
 #include "err.h"
 
 // set tcp connection, which will be used for the communication with the radio server
-void setTcpConnection(int &sock, std::string &host, int &port) {
+void setTcpClientConnection(int &sock, std::string &host, int &port) {
   struct addrinfo addr_hints, *addr_result = NULL;
   memset(&addr_hints, 0, sizeof(struct addrinfo));
   addr_hints.ai_family = AF_INET;
@@ -30,7 +30,7 @@ void setTcpConnection(int &sock, std::string &host, int &port) {
 }
 
 // set udp connection, which will be used for the communication with clients
-void setUdpConnection(int &sock, int &port) {
+void setUdpServerConnection(int &sock, int &port) {
   struct sockaddr_in server_address;
 
   sock = socket(AF_INET, SOCK_DGRAM, 0); // creating IPv4 UDP socket
@@ -88,7 +88,7 @@ void setUdpConnection(int &sock, int &port) {
 // }
 
 // set UDP connection, which will be used to communicate with radio-proxy programs
-void setUdpConnection(int &sock, std::string host, int &port, int timeout, struct sockaddr_in &my_address) {
+void setUdpClientConnection(int &sock, std::string host, int &port, struct sockaddr_in &my_address) {
   struct addrinfo addr_hints;
   struct addrinfo *addr_result;
 

@@ -159,7 +159,7 @@ int main(int argc, char** argv) {
 
   parseInput(argc, argv, host, port_udp, port_tcp, timeout);
 
-  setUdpConnection(sock, host, port_udp, 0, my_address);
+  setUdpClientConnection(sock, host, port_udp, my_address);
 
   TelnetMenu *menu = new TelnetMenu(port_tcp);
   menu->newTelnetConnection(sock_telnet);
