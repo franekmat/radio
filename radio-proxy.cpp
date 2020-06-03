@@ -1,4 +1,5 @@
 #include "data.h"
+#include "connection.h"
 #include "err.h"
 
 #define DEFAULT_TIMEOUT 5
@@ -225,63 +226,6 @@ std::string setRequest (std::string host, std::string resource, std::string meta
   return message;
 }
 
-// set tcp connection, which will be used for the communication with the radio server
-void setTcpConnection(int &sock, std::string &host, int &port) {
-  struct addrinfo addr_hints, *addr_result = NULL;
-  memset(&addr_hints, 0, sizeof(struct addrinfo));
-  addr_hints.ai_family = AF_INET;
-  addr_hints.ai_socktype = SOCK_STREAM;
-  addr_hints.ai_protocol = IPPROTO_TCP;
-
-  int err = getaddrinfo(host.c_str(), std::to_string(port).c_str(), &addr_hints, &addr_result);
-  if (err == EAI_SYSTEM) {
-    error("getaddrinfo: " + std::string(gai_strerror(err)));
-  }
-  else if (err != 0) {
-    error("getaddrinfo: " + std::string(gai_strerror(err)));
-  }
-
-  sock = socket(addr_result->ai_family, addr_result->ai_socktype, addr_result->ai_protocol);
-  if (sock < 0) {
-    error("socket");
-  }
-
-  if (connect(sock, addr_result->ai_addr, addr_result->ai_addrlen) < 0) {
-    error("connect");
-  }
-
-  freeaddrinfo(addr_result);
-}
-
-// set udp connection, which will be used for the communication with clients
-void setUdpConnection(int &sock, int &port, int timeout) {
-  struct sockaddr_in server_address;
-
-  sock = socket(AF_INET, SOCK_DGRAM, 0); // creating IPv4 UDP socket
-	if (sock < 0) {
-    error ("socket");
-  }
-
-  /* setsockopt: Handy debugging trick that lets
-   * us rerun the server immediately after we kill it;
-   * otherwise we have to wait about 20 secs.
-   * Eliminates "ERROR on binding: Address already in use" error.
-   */
-  int optval = 1;
-  setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval , sizeof(int));
-
-
-  // bzero((char *) &server_address, sizeof(server_address)); // ????
-  server_address.sin_family = AF_INET; // IPv4
-	server_address.sin_addr.s_addr = htonl(INADDR_ANY); // listening on all interfaces
-	server_address.sin_port = htons(port); // default port for receiving is PORT_NUM
-
-  // bind the socket to a concrete address
-	if (bind(sock, (struct sockaddr *) &server_address, (socklen_t) sizeof(server_address)) < 0) {
-    error("bind");
-  }
-}
-
 // send TCP request to the radio server
 void sendRequest(int &sock, std::string &message) {
   ssize_t len = message.size();
@@ -449,7 +393,7 @@ int main(int argc, char** argv) {
   parseInput(argc, argv, host, resource, port, meta, timeout, port_clients, timeout_clients, multi);
 
   setTcpConnection(sock, host, port);
-  setUdpConnection(sock_udp, port_clients, timeout_clients);
+  setUdpConnection(sock_udp, port_clients);
 
   std::string message = setRequest(host, resource, meta);
   sendRequest(sock, message);

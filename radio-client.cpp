@@ -1,5 +1,6 @@
-#include "telnetmenu.h"
 #include "data.h"
+#include "connection.h"
+#include "telnetmenu.h"
 #include "err.h"
 
 #define DEFAULT_TIMEOUT 5
@@ -58,41 +59,6 @@ void parseInput(int argc, char **argv, std::string &host, int &port_udp, int &po
   if (!host_inp || !port_udp_inp || !port_tcp_inp) {
     printUsageError(argv[0]);
   }
-}
-
-// set UDP connection, which will be used to communicate with radio-proxy programs
-void setUdpConnection(int &sock, std::string host, int &port, int timeout, struct sockaddr_in &my_address) {
-  struct addrinfo addr_hints;
-  struct addrinfo *addr_result;
-
-  // 'converting' host/port in string to struct addrinfo
-  (void) memset(&addr_hints, 0, sizeof(struct addrinfo));
-  addr_hints.ai_family = AF_INET; // IPv4
-  addr_hints.ai_socktype = SOCK_DGRAM;
-  addr_hints.ai_protocol = IPPROTO_UDP;
-  addr_hints.ai_flags = 0;
-  addr_hints.ai_addrlen = 0;
-  addr_hints.ai_addr = NULL;
-  addr_hints.ai_canonname = NULL;
-  addr_hints.ai_next = NULL;
-  if (getaddrinfo(host.c_str(), NULL, &addr_hints, &addr_result) != 0) {
-    error("getaddrinfo");
-  }
-
-  my_address.sin_family = AF_INET; // IPv4
-  my_address.sin_addr.s_addr = ((struct sockaddr_in*) (addr_result->ai_addr))->sin_addr.s_addr; // address IP
-  my_address.sin_port = htons((uint16_t) port); // port from the command line
-
-  freeaddrinfo(addr_result);
-
-  sock = socket(PF_INET, SOCK_DGRAM, 0);
-  if (sock < 0) {
-    error("socket");
-  }
-
-  // activate broadcast option
-  int optval = 1;
-  setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (const void *)&optval , sizeof(int));
 }
 
 // send DISCOVER message to radio-proxy programs via UDP
