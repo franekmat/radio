@@ -25,6 +25,7 @@ private:
   int port, msgsock, curr_pos = 0, playing_pos = -1;
   struct sockaddr_in server;
 
+  // checking whether clicked button was up arrow
   bool arrowUp (char *buf, int len) {
     if (len == 3 && buf[0] == 27 && buf[1] == 91 && buf[2] == 65) {
       return true;
@@ -32,6 +33,7 @@ private:
     return false;
   }
 
+  // checking whether clicked button was down arrow
   bool arrowDown (char *buf, int len) {
     if (len == 3 && buf[0] == 27 && buf[1] == 91 && buf[2] == 66) {
       return true;
@@ -39,6 +41,7 @@ private:
     return false;
   }
 
+  // checking whether clicked button was enter button
   bool enter (char *buf, int len) {
     if (len == 2 && buf[0] == 13 && buf[1] == 0) {
       return true;
@@ -50,6 +53,7 @@ public:
 
   TelnetMenu(int port) : port(port) {}
 
+  // set new telnet connection via TCP
   void newTelnetConnection(int &sock) {
     sock = socket(PF_INET, SOCK_STREAM, 0);
     if (sock == -1) {
@@ -69,6 +73,7 @@ public:
     }
   }
 
+  // add a new client - the new radio-proxy
   int addClient(int &sock) {
     int client_size = sizeof( struct sockaddr_in);
     struct sockaddr_in client_addr;
@@ -79,34 +84,39 @@ public:
     return msgsock;
   }
 
+  // write string on the telnet menu
   void writeTelnet(std::string s) {
     if (write(msgsock, s.data(), s.size()) == -1) {
       error("send");
     }
   }
 
+  // write linux cursor at the beginning on the pos line of the telnet menu
   void writeCursor(int pos) {
     writeTelnet("\033[" + std::to_string(pos + 1) + ";1H");
   }
 
+  // clearing telnet menu vector and add 2 default options
   void setupTelnetMenu () {
     telnet_menu.clear();
     telnet_menu.push_back("Szukaj pośrednika");
     telnet_menu.push_back("Koniec");
   }
 
+  // write all lines of the telnet menu from telnet_menu vector
   void writeTelnetMenu() {
     writeTelnet(CLEAR);
     for (int i = 0; i < telnet_menu.size(); i++) {
       std::string s = telnet_menu[i];
-      if (i == playing_pos) {
-        s += POINTER;
+      if (i == playing_pos) { // that line contains radio that is playing now
+        s += POINTER; // place '*' on the right of the radio name
       }
       writeTelnet(s + NEW_LINE);
     }
     writeCursor(curr_pos);
   }
 
+  // setup telnet menu by turning it into character mode and sending all default options
   void setupTelnet() {
     writeTelnet(SETUP_TELNET);
     setupTelnetMenu();
@@ -114,12 +124,15 @@ public:
     writeTelnetMenu();
   }
 
+  // add new discovered radio to the telnet menu
   void addRadio(std::string s) {
+    // the last option in the menu is the 'Koniec' option
     if (telnet_menu.back() == "Koniec") {
       telnet_menu.pop_back();
       telnet_menu.push_back(s);
       telnet_menu.push_back("Koniec");
     }
+    // the last option in the menu is an informaton about playing radio
     else {
       std::string meta = telnet_menu.back();
       telnet_menu.pop_back();
@@ -132,15 +145,19 @@ public:
     writeTelnetMenu();
   }
 
+  // get current position of the cursor in the telnet menu
   int getCurrPos() {
     return curr_pos;
   }
 
+  // set playing radio in the telnet menu
+  // (by placing then '*' on the right of that radio name)
   void setPlayingPos(int pos) {
     playing_pos = pos;
     writeTelnetMenu();
   }
 
+  // get the title of the playing song from meta data string
   std::string getTitleFromMeta(std::string meta) {
     if (meta.substr(0, 13) == "StreamTitle='") {
       std::string res = "";
@@ -152,6 +169,7 @@ public:
     return meta;
   }
 
+  // change title of the song displayed at the end of the menu to the new one
   void changeMeta(std::string s) {
     if (telnet_menu.back() != "Koniec") {
       telnet_menu.pop_back();
@@ -161,12 +179,14 @@ public:
     writeTelnetMenu();
   }
 
+  // delete radio, which is displayed at the radio_pos line in the telnet menu
   void deleteRadio(int radio_pos) {
     telnet_menu.erase(telnet_menu.begin() + radio_pos);
     //zmiana curr_pos?
     writeTelnetMenu();
   }
 
+  // detect actions - pressed button on telnet menu
   int runTelnet(int timeout) {
     int buf_size = 16, len;
     char buf[buf_size];
@@ -187,14 +207,17 @@ public:
         writeTelnetMenu();
       }
       else if (enter(buf, len)) {
+        // search proxy
         if (curr_pos == 0) {
           return 1;
         }
+        // close menu
         else if (curr_pos < telnet_menu.size() && telnet_menu[curr_pos] == "Koniec") {
           if (close(msgsock) < 0) {
             error("Closing socket");
           }
         }
+        // change playing radio
         else {
           return 2;
         }
