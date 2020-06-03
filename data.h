@@ -29,20 +29,24 @@
 #define AUDIO 4
 #define METADATA 6
 
+// check if host name is valid
 void checkHostName (std::string host) {
   //check if proper value
 }
 
+// check if resource name is valid
 void checkResource (std::string resource) {
   //check if proper value
 }
 
+// check if multi address is valid
 void checkMulti (std::string multi) {
   //check if proper value
 }
 
+// check if given string contains only digits
 bool containsOnlyDigits (std::string s) {
-  /* I want to ignore leading and trailing spaces */
+  // we want to ignore leading and trailing spaces
   int l = 0, p = s.size() - 1;
   while (l < s.size() && s[l] == ' ') {
     l++;
@@ -50,7 +54,7 @@ bool containsOnlyDigits (std::string s) {
   while (p >= 0 && s[p] == ' ') {
     p--;
   }
-  /* now check if number contains something other than digit characters */
+  // now check if number contains something other than digit characters
   for (int i = l; i <= p; i++) {
     if (s[i] < '0' || s[i] > '9') {
       return false;
@@ -59,6 +63,7 @@ bool containsOnlyDigits (std::string s) {
   return true;
 }
 
+// get int value from the string or return error if it is not valid number
 int getValueFromString (std::string value, std::string whatsthat) {
   if (!containsOnlyDigits(value)) {
     std::string err_msg = "Invalid " + whatsthat + " number";
@@ -77,31 +82,36 @@ int getValueFromString (std::string value, std::string whatsthat) {
   return ret_val;
 }
 
+// check if port parameter is valid
 void checkPort (std::string port) {
   if (0) {
     error("Invalid port number");
   }
 }
 
+// check if meta parameter is valid
 void checkMeta (std::string meta) {
   if (meta != "yes" && meta != "no") {
     error ("Wrong format of meta argument");
   }
 }
 
+// check if timeout parameter is valid
 void checkTimeout (std::string timeout) {
   if (0) {
     error("Invalid timeout number");
   }
 }
 
+// gettimeofday in microsecond
 unsigned long long gettimelocal() {
    struct timeval t = {0,0};
    gettimeofday(&t,NULL);
    return ((unsigned long long)t.tv_sec * 1000000) + t.tv_usec;
 }
 
-//https://stackoverflow.com/questions/5585532/c-int-to-byte-array/43515755#43515755
+// convert received in network byte order number as 2 bytes into host byte order int
+// https://stackoverflow.com/questions/5585532/c-int-to-byte-array/43515755#43515755
 int bytesToInt (char b1, char b2) {
   int res = 0;
   res <<= 8;
@@ -111,7 +121,8 @@ int bytesToInt (char b1, char b2) {
   return ntohs(res);
 }
 
-//https://stackoverflow.com/questions/5585532/c-int-to-byte-array/43515755#43515755
+// convert host byte order int to 2 bytes in network byte order
+// https://stackoverflow.com/questions/5585532/c-int-to-byte-array/43515755#43515755
 std::string intToBytes (int x) {
   std::string res = "";
   x = htons(x);
@@ -120,6 +131,7 @@ std::string intToBytes (int x) {
   return res;
 }
 
+// get string type from int value, as in the task description
 std::string getType (int n) {
   if (n == 1) {
     return "DISCOVER";
@@ -141,12 +153,12 @@ std::string getType (int n) {
   }
 }
 
-/* check if received header contains icy-metaint */
+// checking if received header contains icy-metaint
 bool containsMeta (std::string header) {
   return (header.find("icy-metaint:") != std::string::npos);
 }
 
-/* get icy-metaint value from header */
+// get icy-metaint value from the header string
 int getMetaInt (std::string header) {
   std::size_t found = header.find("icy-metaint:");
   header.erase(0, found + strlen("icy-metaint:"));
@@ -154,34 +166,41 @@ int getMetaInt (std::string header) {
   return getValueFromString(value, "metaint");
 }
 
-/* get radio name from header */
+// get radio name from the header string
 std::string getMetaName (std::string header) {
   std::size_t found = header.find("icy-name:");
   header.erase(0, found + strlen("icy-name:"));
   return header.substr(0, header.find("\r\n"));
 }
 
+// checking if given buffer string contains the end of the header
 bool containsEndOfHeader(std::string &buffer) {
   return (buffer.find("\r\n\r\n") != std::string::npos);
 }
 
+// get status from the header of the received response from the server
 std::string getStatus (std::string &header) {
   std::size_t found = header.find("\r\n");
   return header.substr(0, found);
 }
 
+// checking if status of the response is OK or not
 bool okStatus (std::string &status) {
   return (status == "HTTP/1.0 200 OK" || status == "HTTP/1.1 200 OK" || status == "ICY 200 OK");
 }
 
-/* cut header from buffer and return header */
+// cut header from the buffer, we know that it is there, and return header
 std::string getHeader(std::string &buffer) {
+  std::string header = "";
   std::size_t found = buffer.find("\r\n\r\n");
-  std::string header = buffer.substr(0, found);
-  buffer.erase(0, found + strlen("\r\n\r\n"));
+  if (found != std::string::npos) {
+    header = buffer.substr(0, found);
+    buffer.erase(0, found + strlen("\r\n\r\n"));
+  }
   return header;
 }
 
+// get size of the meta data, which is 16 times first byte of meta data
 int getMetaSize(std::string &buffer) {
   if (buffer.empty()) {
     error("Cannot get size of meta from empty buffer");
@@ -189,6 +208,7 @@ int getMetaSize(std::string &buffer) {
   return (int)buffer[0] * 16;
 }
 
+// get 4 byte header of the message from type and length of it
 std::string getUdpHeader (std::string type, int length) {
   if (type == "DISCOVER") {
     return intToBytes(1) + intToBytes(length);
@@ -210,6 +230,7 @@ std::string getUdpHeader (std::string type, int length) {
   }
 }
 
+// checking if received message contains proper header and has valid length
 bool checkReceivedMessage(std::string buffer, int len) {
   if (buffer.size() < 4) {
     return false;
