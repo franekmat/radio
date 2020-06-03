@@ -95,7 +95,7 @@ void searchProxy(int &sock_udp, struct sockaddr_in &my_address) {
   ssize_t len = mess.size();
 
   socklen_t rcva_len = (socklen_t) sizeof(my_address);
-  ssize_t snd_len = sendto(sock_udp, mess.c_str(), mess.size(), 0, (struct sockaddr *) &my_address, rcva_len);
+  ssize_t snd_len = sendto(sock_udp, mess.data(), mess.size(), 0, (struct sockaddr *) &my_address, rcva_len);
   if (snd_len != (ssize_t) len) {
     error("partial / failed write");
   }

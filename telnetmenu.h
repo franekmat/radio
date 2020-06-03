@@ -135,7 +135,7 @@ public:
       telnet_menu.push_back("Koniec");
       telnet_menu.push_back(meta);
     }
-    curr_pos = 0;
+    // curr_pos = 0;
     writeTelnetMenu();
   }
 
@@ -186,8 +186,12 @@ public:
         writeTelnetMenu();
       }
       else if (arrowDown(buf, len)) {
-          curr_pos = std::min(curr_pos + 1, (int)telnet_menu.size() - 1);
-          writeTelnetMenu();
+        int max_size = (int) telnet_menu.size() - 1;
+        if (telnet_menu[max_size] != "Koniec") {
+          max_size--;
+        }
+        curr_pos = std::min(curr_pos + 1, max_size);
+        writeTelnetMenu();
       }
       else if (enter(buf, len)) {
         if (curr_pos == 0) {
