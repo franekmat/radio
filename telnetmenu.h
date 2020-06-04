@@ -17,7 +17,7 @@ class TelnetMenu {
 private:
   const int QUEUE_LENGTH = 5;
   const std::string SETUP_TELNET = "\377\375\042\377\373\001";
-  const std::string CLEAR = "\033[1J\033[H";
+  const std::string CLEAR = "\033[H\033[J";
   const std::string POINTER = " *";
   const std::string NEW_LINE = "\r\n";
 
