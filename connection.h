@@ -52,6 +52,28 @@ void setUdpServerConnection(int &sock, int &port, bool binding) {
   }
 }
 
+void setUdpServerConnection0(int &sock, bool binding) {
+  struct sockaddr_in server_address;
+
+  sock = socket(AF_INET, SOCK_DGRAM, 0); // creating IPv4 UDP socket
+	if (sock < 0) {
+    error ("socket");
+  }
+
+  int optval = 1;
+  // setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval , sizeof(int));
+  setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, (const void *)&optval , sizeof(int));
+
+
+  server_address.sin_family = AF_INET; // IPv4
+	server_address.sin_addr.s_addr = htonl(INADDR_ANY); // listening on all interfaces
+  server_address.sin_port = 0; // default port for receiving is PORT_NUM
+
+	if (binding && bind(sock, (struct sockaddr *) &server_address, (socklen_t) sizeof(server_address)) < 0) {
+    error("bind");
+  }
+}
+
 // set UDP connection, which will be used to communicate with radio-proxy programs
 void setUdpClientConnection(int &sock, std::string host, int &port, struct sockaddr_in &my_address) {
   struct addrinfo addr_hints;

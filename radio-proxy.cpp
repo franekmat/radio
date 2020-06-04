@@ -4,7 +4,7 @@
 
 #define DEFAULT_TIMEOUT 5
 #define DEFAULT_META "no"
-#define BUFFER_SIZE 2048
+#define BUFFER_SIZE 4096
 #define HEADER_SIZE 4
 
 typedef std::deque <std::pair<struct sockaddr_in, unsigned long long> > ClientsDeque;
@@ -16,7 +16,7 @@ typedef std::deque <std::pair<struct sockaddr_in, unsigned long long> > ClientsD
 // ACTIVATE_CLIENTS = true, if there is -P
 bool ACTIVATE_CLIENTS = false;
 
-int sock_send, sock_receive;
+int sock_send;
 
 
 // function, which prints proper usage of the 'name' program
@@ -161,7 +161,45 @@ void updateClients(int &sock_udp, ClientsDeque &clients, std::string radio_name)
     if (getType(bytesToInt(buffer[0], buffer[1])) == "DISCOVER" && !findClient(client_address, clients)) {
       std::cerr << "odebralem discover od " << client_address.sin_addr.s_addr << ", " << client_address.sin_port << "\n";
       std::string message = getUdpHeader("IAM", radio_name.size()) + radio_name;
-      ssize_t snd_len = sendto(sock_udp, message.data(), message.size(), 0, (struct sockaddr *) &client_address, rcva_len);
+      ssize_t snd_len = sendto(sock_send, message.data(), message.size(), 0, (struct sockaddr *) &client_address, rcva_len);
+      if (snd_len != message.size()) {
+        error("error on sending datagram to client socket");
+      }
+    }
+    else {
+      std::cerr << "odebralem keep alive od " << client_address.sin_addr.s_addr << ", " << client_address.sin_port << "\n";
+    }
+
+    // else {
+      deleteClient(client_address, clients);
+      clients.push_back(std::make_pair(client_address, gettimelocal()));
+    // }
+  }
+
+  len = 1;
+  struct pollfd fds2[1] = {{sock_send, 0 | POLLIN}};
+
+  while (len > 0) {
+    rcva_len = (socklen_t) sizeof(client_address);
+    buffer.resize(BUFFER_SIZE + HEADER_SIZE);
+    if (poll(fds2, 1, 100) == 0) {
+      // std::cerr << "nic nie dostalem :(\n";
+      break;
+    }
+    len = recvfrom(sock_send, &buffer[0], buffer.size(), 0, (struct sockaddr *) &client_address, &rcva_len);
+    if (len < 0) {
+      error("error on datagram from client socket");
+    }
+    buffer.resize(len);
+
+    if (!checkReceivedMessage(buffer, len)) {
+      continue;
+    }
+
+    if (getType(bytesToInt(buffer[0], buffer[1])) == "DISCOVER" && !findClient(client_address, clients)) {
+      std::cerr << "odebralem discover od " << client_address.sin_addr.s_addr << ", " << client_address.sin_port << "\n";
+      std::string message = getUdpHeader("IAM", radio_name.size()) + radio_name;
+      ssize_t snd_len = sendto(sock_send, message.data(), message.size(), 0, (struct sockaddr *) &client_address, rcva_len);
       if (snd_len != message.size()) {
         error("error on sending datagram to client socket");
       }
@@ -188,7 +226,7 @@ void sendUdpMessage(int &sock_udp, std::string message, ClientsDeque &clients) {
     if (current_time - client.second < 5000000) {
       std::cout << "sending " << message.size() << " to " << client.first.sin_port << "\n";
       client_address = client.first;
-      snd_len = sendto(sock_udp, message.data(), message.size(), 0, (struct sockaddr *) &client_address, snda_len);
+      snd_len = sendto(sock_send, message.data(), message.size(), 0, (struct sockaddr *) &client_address, snda_len);
       if (snd_len != message.size()) {
         error("error on sending datagram to client socket");
       }
@@ -411,8 +449,7 @@ int main(int argc, char** argv) {
 
   setTcpClientConnection(sock, host, port);
   setUdpServerConnection(sock_udp, port_clients, true);
-  // setUdpServerConnection(sock_receive, port_clients, false);
-  // setUdpServerConnection(sock_send, port_clients, false);
+  setUdpServerConnection0(sock_send, true);
 
   std::string message = setRequest(host, resource, meta);
   sendRequest(sock, message);

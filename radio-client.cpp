@@ -5,7 +5,7 @@
 
 #define DEFAULT_TIMEOUT 5
 #define DEFAULT_META "no"
-#define BUFFER_SIZE 2048
+#define BUFFER_SIZE 4096
 #define HEADER_SIZE 4
 
 typedef std::deque <std::pair<struct sockaddr_in, unsigned long long> > RadiosDeque;
@@ -116,7 +116,7 @@ void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos
   }
   buffer.resize(rcv_len);
 
-  std::cerr << "dostalem cos od " << radio_address.sin_addr.s_addr << " (" << radio_address.sin_port << ")\n";
+  // std::cerr << "dostalem cos od " << radio_address.sin_addr.s_addr << " (" << radio_address.sin_port << ")\n";
 
   // check whether message is valid
   if (!checkReceivedMessage(buffer, rcv_len)) {
@@ -155,7 +155,7 @@ void runClient (int &sock_udp, struct sockaddr_in &my_address, TelnetMenu *&menu
     // return runClient (sock_udp, my_address, menu, timeout, menu->getCurrPos());
 
     radio_pos = menu->getCurrPos();
-    std::cerr << "booom selected radio #" << radio_pos << "\n";
+    // std::cerr << "booom selected radio #" << radio_pos << "\n";
     menu->setPlayingPos(radio_pos);
     my_address = radios[radio_pos - 1].first;
     sendKeepAlive(sock_udp, my_address, last_time);
@@ -165,14 +165,14 @@ void runClient (int &sock_udp, struct sockaddr_in &my_address, TelnetMenu *&menu
     return;
   }
   //czy takie mierzenie tego czasu jest ok?
-  std::cerr << "obecny czas - radiowy = " << gettimelocal() - radios[radio_pos - 1].second << "\n";
+  // std::cerr << "obecny czas - radiowy = " << gettimelocal() - radios[radio_pos - 1].second << "\n";
   if (gettimelocal() - radios[radio_pos - 1].second >= 3500000) {
     std::cerr << "wysylam keep alive do " << radios[radio_pos - 1].first.sin_addr.s_addr << ", " << radios[radio_pos - 1].first.sin_port << "\n";
-    std::cerr << "btw : \n";
-    for (int i = 0; i < radios.size(); i++) {
-      std::cerr << radios[i].first.sin_addr.s_addr << "(" << radios[i].first.sin_port << "), ";
-    }
-    std::cerr << "\n";
+    // std::cerr << "btw : \n";
+    // for (int i = 0; i < radios.size(); i++) {
+    //   std::cerr << radios[i].first.sin_addr.s_addr << "(" << radios[i].first.sin_port << "), ";
+    // }
+    // std::cerr << "\n";
     sendKeepAlive(sock_udp, my_address, last_time);
     radios[radio_pos - 1].second = gettimelocal();
   }
