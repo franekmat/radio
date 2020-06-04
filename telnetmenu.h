@@ -182,7 +182,12 @@ public:
   // delete radio, which is displayed at the radio_pos line in the telnet menu
   void deleteRadio(int radio_pos) {
     telnet_menu.erase(telnet_menu.begin() + radio_pos);
-    //zmiana curr_pos?
+    if (radio_pos == curr_pos) {
+      curr_pos = 0;
+    }
+    if (radio_pos == playing_pos) {
+      playing_pos = -1;
+    }
     writeTelnetMenu();
   }
 
