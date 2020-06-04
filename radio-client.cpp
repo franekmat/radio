@@ -8,7 +8,7 @@
 #define BUFFER_SIZE 2048
 #define HEADER_SIZE 4
 
-typedef std::deque <struct sockaddr_in> RadiosDeque;
+typedef std::deque <std::pair<struct sockaddr_in, unsigned long long> > RadiosDeque;
 
 struct sockaddr_in broadcast_address;
 
@@ -68,6 +68,7 @@ void parseInput(int argc, char **argv, std::string &host, int &port_udp, int &po
 // send DISCOVER message to radio-proxy programs via UDP
 void searchProxy(int &sock_udp, struct sockaddr_in &my_address) {
   std::string mess = getUdpHeader("DISCOVER", 0);
+  std::cerr << "wysylam discover broadcastem do " << broadcast_address.sin_addr.s_addr << ", " << broadcast_address.sin_port << "\n";
   ssize_t len = mess.size();
   socklen_t rcva_len = (socklen_t) sizeof(broadcast_address);
   ssize_t snd_len = sendto(sock_udp, mess.data(), mess.size(), 0, (struct sockaddr *) &broadcast_address, rcva_len);
@@ -87,6 +88,11 @@ void sendKeepAlive(int &sock_udp, struct sockaddr_in &my_address, int &last_time
   if (snd_len != (ssize_t) len) {
     error("partial / failed write");
   }
+}
+
+bool compareRadios(struct sockaddr_in &radio1, struct sockaddr_in &radio2) {
+  return (radio1.sin_addr.s_addr == radio2.sin_addr.s_addr &&
+      radio1.sin_port == radio2.sin_port);
 }
 
 // receive response from the radio-proxy: AUDIO, METADATA or IAM
@@ -110,6 +116,8 @@ void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos
   }
   buffer.resize(rcv_len);
 
+  std::cerr << "dostalem cos od " << radio_address.sin_addr.s_addr << " (" << radio_address.sin_port << ")\n";
+
   // check whether message is valid
   if (!checkReceivedMessage(buffer, rcv_len)) {
     return receiveStream(sock_udp, menu, timeout, radio_pos, radios);
@@ -119,14 +127,14 @@ void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos
   int leng = bytesToInt(buffer[2], buffer[3]);
   buffer.erase(0, 4);
 
-  if (type == "AUDIO") {
+  if (type == "AUDIO" && compareRadios(radio_address, radios[radio_pos - 1].first)) {
     std::cout << buffer;
   }
-  else if (type == "METADATA") {
+  else if (type == "METADATA" && compareRadios(radio_address, radios[radio_pos - 1].first)) {
     menu->changeMeta(buffer);
   }
   else if (type == "IAM") {
-    radios.push_back(radio_address);
+    radios.push_back(std::make_pair(radio_address, gettimelocal()));
     menu->addRadio(buffer);
   }
 }
@@ -137,23 +145,36 @@ void runClient (int &sock_udp, struct sockaddr_in &my_address, TelnetMenu *&menu
   int action = menu->runTelnet(10);
   /* akcja równa 1 oznacza, że ktoś wybrał w menu szukanie pośrednika */
   if (action == 1) {
-    searchProxy(sock_udp, my_address);
+    for (int i = 0; i < radios.size() + 1; i++) {
+      searchProxy(sock_udp, my_address);
+    }
     receiveStream(sock_udp, menu, timeout, radio_pos, radios);
   }
   /* akcja równa 2 oznacza, że ktoś wybrał w menu radio do odtwarzania */
   else if (action == 2) {
     // return runClient (sock_udp, my_address, menu, timeout, menu->getCurrPos());
+
     radio_pos = menu->getCurrPos();
+    std::cerr << "booom selected radio #" << radio_pos << "\n";
     menu->setPlayingPos(radio_pos);
-    my_address = radios[radio_pos - 1];
+    my_address = radios[radio_pos - 1].first;
+    sendKeepAlive(sock_udp, my_address, last_time);
   }
   //nic nie odtwarzamy, wiec nikomu nie wysylamy keepalive (czy aby na pewno?)
   if (radio_pos < 0) {
     return;
   }
   //czy takie mierzenie tego czasu jest ok?
-  if (gettimelocal() - last_time >= 3500000 || last_time == -1) {
+  std::cerr << "obecny czas - radiowy = " << gettimelocal() - radios[radio_pos - 1].second << "\n";
+  if (gettimelocal() - radios[radio_pos - 1].second >= 3500000) {
+    std::cerr << "wysylam keep alive do " << radios[radio_pos - 1].first.sin_addr.s_addr << ", " << radios[radio_pos - 1].first.sin_port << "\n";
+    std::cerr << "btw : \n";
+    for (int i = 0; i < radios.size(); i++) {
+      std::cerr << radios[i].first.sin_addr.s_addr << "(" << radios[i].first.sin_port << "), ";
+    }
+    std::cerr << "\n";
     sendKeepAlive(sock_udp, my_address, last_time);
+    radios[radio_pos - 1].second = gettimelocal();
   }
   receiveStream(sock_udp, menu, timeout, radio_pos, radios);
 }

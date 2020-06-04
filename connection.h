@@ -30,7 +30,7 @@ void setTcpClientConnection(int &sock, std::string &host, int &port) {
 }
 
 // set udp connection, which will be used for the communication with clients
-void setUdpServerConnection(int &sock, int &port) {
+void setUdpServerConnection(int &sock, int &port, bool binding) {
   struct sockaddr_in server_address;
 
   sock = socket(AF_INET, SOCK_DGRAM, 0); // creating IPv4 UDP socket
@@ -42,17 +42,14 @@ void setUdpServerConnection(int &sock, int &port) {
   // setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval , sizeof(int));
   setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, (const void *)&optval , sizeof(int));
 
-  // setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (const void *)&optval , sizeof(int));
-
 
   server_address.sin_family = AF_INET; // IPv4
 	server_address.sin_addr.s_addr = htonl(INADDR_ANY); // listening on all interfaces
   server_address.sin_port = htons(port); // default port for receiving is PORT_NUM
 
-	if (bind(sock, (struct sockaddr *) &server_address, (socklen_t) sizeof(server_address)) < 0) {
+	if (binding && bind(sock, (struct sockaddr *) &server_address, (socklen_t) sizeof(server_address)) < 0) {
     error("bind");
   }
-
 }
 
 // set UDP connection, which will be used to communicate with radio-proxy programs
