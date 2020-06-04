@@ -107,7 +107,7 @@ public:
   void writeTelnetMenu() {
     writeTelnet(CLEAR);
     for (int i = 0; i < telnet_menu.size(); i++) {
-      std::string s = telnet_menu[i];
+      std::string s = " " + telnet_menu[i]; // space before radio name for a cursor
       if (i == playing_pos) { // that line contains radio that is playing now
         s += POINTER; // place '*' on the right of the radio name
       }

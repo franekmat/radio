@@ -10,8 +10,6 @@
 
 typedef std::deque <std::pair<struct sockaddr_in, unsigned long long> > RadiosDeque;
 
-struct sockaddr_in broadcast_address;
-
 // function, which prints proper usage of the 'name' program
 void printUsageError(std::string name) {
   std::string err_msg = "Usage: " + name + " -H host -P port -p port -T timeout";
@@ -66,12 +64,11 @@ void parseInput(int argc, char **argv, std::string &host, int &port_udp, int &po
 }
 
 // send DISCOVER message to radio-proxy programs via UDP
-void searchProxy(int &sock_udp, struct sockaddr_in &my_address) {
+void searchProxy(int &sock_udp, struct sockaddr_in &address) {
   std::string mess = getUdpHeader("DISCOVER", 0);
-  std::cerr << "wysylam discover broadcastem do " << broadcast_address.sin_addr.s_addr << ", " << broadcast_address.sin_port << "\n";
   ssize_t len = mess.size();
-  socklen_t rcva_len = (socklen_t) sizeof(broadcast_address);
-  ssize_t snd_len = sendto(sock_udp, mess.data(), mess.size(), 0, (struct sockaddr *) &broadcast_address, rcva_len);
+  socklen_t rcva_len = (socklen_t) sizeof(address);
+  ssize_t snd_len = sendto(sock_udp, mess.data(), mess.size(), 0, (struct sockaddr *) &address, rcva_len);
   if (snd_len != (ssize_t) len) {
     error("partial / failed write");
   }
@@ -90,6 +87,7 @@ void sendKeepAlive(int &sock_udp, struct sockaddr_in &my_address, int &last_time
   }
 }
 
+// checking if 2 given radios are the same
 bool compareRadios(struct sockaddr_in &radio1, struct sockaddr_in &radio2) {
   return (radio1.sin_addr.s_addr == radio2.sin_addr.s_addr &&
       radio1.sin_port == radio2.sin_port);
@@ -116,8 +114,6 @@ void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos
   }
   buffer.resize(rcv_len);
 
-  // std::cerr << "dostalem cos od " << radio_address.sin_addr.s_addr << " (" << radio_address.sin_port << ")\n";
-
   // check whether message is valid
   if (!checkReceivedMessage(buffer, rcv_len)) {
     return receiveStream(sock_udp, menu, timeout, radio_pos, radios);
@@ -141,12 +137,12 @@ void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos
 
 // function that detects actions on the telnet menu, receive stream from
 // the radio-proxy and send them KEEPALIVE messages
-void runClient (int &sock_udp, struct sockaddr_in &my_address, TelnetMenu *&menu, int timeout, int &last_time, int &radio_pos, RadiosDeque &radios) {
+void runClient (int &sock_udp, struct sockaddr_in &my_address, struct sockaddr_in &broadcast_address, TelnetMenu *&menu, int timeout, int &last_time, int &radio_pos, RadiosDeque &radios) {
   int action = menu->runTelnet(10);
   /* akcja równa 1 oznacza, że ktoś wybrał w menu szukanie pośrednika */
   if (action == 1) {
     for (int i = 0; i < radios.size() + 1; i++) {
-      searchProxy(sock_udp, my_address);
+      searchProxy(sock_udp, broadcast_address);
     }
     receiveStream(sock_udp, menu, timeout, radio_pos, radios);
   }
@@ -165,14 +161,7 @@ void runClient (int &sock_udp, struct sockaddr_in &my_address, TelnetMenu *&menu
     return;
   }
   //czy takie mierzenie tego czasu jest ok?
-  // std::cerr << "obecny czas - radiowy = " << gettimelocal() - radios[radio_pos - 1].second << "\n";
   if (gettimelocal() - radios[radio_pos - 1].second >= 3500000) {
-    std::cerr << "wysylam keep alive do " << radios[radio_pos - 1].first.sin_addr.s_addr << ", " << radios[radio_pos - 1].first.sin_port << "\n";
-    // std::cerr << "btw : \n";
-    // for (int i = 0; i < radios.size(); i++) {
-    //   std::cerr << radios[i].first.sin_addr.s_addr << "(" << radios[i].first.sin_port << "), ";
-    // }
-    // std::cerr << "\n";
     sendKeepAlive(sock_udp, my_address, last_time);
     radios[radio_pos - 1].second = gettimelocal();
   }
@@ -189,7 +178,7 @@ int main(int argc, char** argv) {
 
   setUdpClientConnection(sock, host, port_udp, my_address);
 
-  broadcast_address = my_address;
+  struct sockaddr_in broadcast_address = my_address;
 
   TelnetMenu *menu = new TelnetMenu(port_tcp);
   menu->newTelnetConnection(sock_telnet);
@@ -198,7 +187,7 @@ int main(int argc, char** argv) {
 
   int last_keepalive_time = -1, radio_pos = -1;
   while (1) {
-    runClient(sock, my_address, menu, timeout, last_keepalive_time, radio_pos, radios);
+    runClient(sock, my_address, broadcast_address, menu, timeout, last_keepalive_time, radio_pos, radios);
   }
 
   return 0;
