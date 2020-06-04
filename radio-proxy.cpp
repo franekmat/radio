@@ -132,9 +132,7 @@ std::string getUdpMessage(std::string type, int length, std::string data) {
   return message;
 }
 
-// check if someone send us DISCOVER or KEEPALIVE message and update clients deque
-// if that was DISCOVER message send them back IAM message with radio information
-void updateClients(int &sock_udp, ClientsDeque &clients, std::string radio_name) {
+void findNewClients(int &sock_udp, ClientsDeque &clients, std::string radio_name) {
   struct sockaddr_in client_address;
   socklen_t rcva_len;
   ssize_t len = 1;
@@ -175,14 +173,21 @@ void updateClients(int &sock_udp, ClientsDeque &clients, std::string radio_name)
       clients.push_back(std::make_pair(client_address, gettimelocal()));
     // }
   }
+}
 
-  len = 1;
-  struct pollfd fds2[1] = {{sock_send, 0 | POLLIN}};
+// check if someone send us DISCOVER or KEEPALIVE message and update clients deque
+// if that was DISCOVER message send them back IAM message with radio information
+void updateClients(int &sock_udp, ClientsDeque &clients, std::string radio_name) {
+  struct sockaddr_in client_address;
+  socklen_t rcva_len;
+  ssize_t len = 1;
+  std::string buffer;
+  struct pollfd fds[1] = {{sock_send, 0 | POLLIN}};
 
   while (len > 0) {
     rcva_len = (socklen_t) sizeof(client_address);
     buffer.resize(BUFFER_SIZE + HEADER_SIZE);
-    if (poll(fds2, 1, 100) == 0) {
+    if (poll(fds, 1, 100) == 0) {
       // std::cerr << "nic nie dostalem :(\n";
       break;
     }
@@ -241,6 +246,7 @@ void printData (std::string data, int &sock_udp, ClientsDeque &clients, std::str
     return;
   }
   if (ACTIVATE_CLIENTS) {
+    findNewClients(sock_udp, clients, radio_name);
     updateClients(sock_udp, clients, radio_name);
     std::string message = getUdpMessage("AUDIO", (int)data.size(), data);
     sendUdpMessage(sock_udp, message, clients);
@@ -257,6 +263,7 @@ void printMeta (std::string meta, int &sock_udp, ClientsDeque &clients, std::str
     return;
   }
   if (ACTIVATE_CLIENTS) {
+    findNewClients(sock_udp, clients, radio_name);
     updateClients(sock_udp, clients, radio_name);
     std::string message = getUdpMessage("METADATA", (int)meta.size(), meta);
     sendUdpMessage(sock_udp, message, clients);
