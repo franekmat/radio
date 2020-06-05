@@ -3,11 +3,6 @@
 #include "telnetmenu.h"
 #include "err.h"
 
-#define DEFAULT_TIMEOUT 5
-#define DEFAULT_META "no"
-#define BUFFER_SIZE 4096
-#define HEADER_SIZE 4
-
 typedef std::deque <std::pair<struct sockaddr_in, unsigned long long> > RadiosDeque;
 
 // function, which prints proper usage of the 'name' program
@@ -75,8 +70,7 @@ void searchProxy(int &sock_udp, struct sockaddr_in &address) {
 }
 
 // send KEEPALIVE message to radio-proxy programs and save time when that happens
-void sendKeepAlive(int &sock_udp, struct sockaddr_in &my_address, int &last_time) {
-  last_time = gettimelocal();
+void sendKeepAlive(int &sock_udp, struct sockaddr_in &my_address) {
   std::string nth = getUdpHeader("KEEPALIVE", 0);
   ssize_t len = nth.size();
 
@@ -103,9 +97,11 @@ void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos
 
   buffer.resize(BUFFER_SIZE + HEADER_SIZE);
   if (poll(fds, 1, timeout * 1000) == 0) {
-    menu->deleteRadio(radio_pos);
-    radios.erase(radios.begin() + radio_pos - 1);
-    radio_pos = -1;
+    if (radio_pos != -1) {
+      menu->deleteRadio(radio_pos);
+      radios.erase(radios.begin() + radio_pos - 1);
+      radio_pos = -1;
+    }
     return;
   }
   rcv_len = recvfrom(sock_udp, &buffer[0], buffer.size(), 0, (struct sockaddr *) &radio_address, &rcva_len);
@@ -114,19 +110,30 @@ void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos
   }
   buffer.resize(rcv_len);
 
+  // std::cerr << "cos dostalem...\n";
+
   // check whether message is valid
   if (!checkReceivedMessage(buffer, rcv_len)) {
     return receiveStream(sock_udp, menu, timeout, radio_pos, radios);
   }
 
+  // std::cerr << "o to jest valid...\n";
+  // std::cerr << "radio_pos = " << radio_pos << "\n";
+
   std::string type = getType(bytesToInt(buffer[0], buffer[1]));
   int leng = bytesToInt(buffer[2], buffer[3]);
   buffer.erase(0, 4);
 
-  if (type == "AUDIO" && compareRadios(radio_address, radios[radio_pos - 1].first)) {
+  // std::cerr << "type = " << type << ", length = " << leng << "\n";
+  // if (radio_pos != -1) std::cerr << "uwaga.... " << compareRadios(radio_address, radios[radio_pos - 1].first) << " + " << (type == "AUDIO") << "\n";
+
+  if (radio_pos != -1 && type.compare("AUDIO") == 0 && compareRadios(radio_address, radios[radio_pos - 1].first)) {
     std::cout << buffer;
+    // std::cerr << "WTFWTWFTWFTW\n";
+    // std::cout.flush();
+    std::cerr << "odebralem stream od " << radios[radio_pos - 1].first.sin_addr.s_addr << "(" << radios[radio_pos - 1].first.sin_port << ")\n";
   }
-  else if (type == "METADATA" && compareRadios(radio_address, radios[radio_pos - 1].first)) {
+  else if (radio_pos != -1 && type == "METADATA" && compareRadios(radio_address, radios[radio_pos - 1].first)) {
     menu->changeMeta(buffer);
   }
   else if (type == "IAM") {
@@ -137,7 +144,7 @@ void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos
 
 // function that detects actions on the telnet menu, receive stream from
 // the radio-proxy and send them KEEPALIVE messages
-void runClient (int &sock_udp, struct sockaddr_in &my_address, struct sockaddr_in &broadcast_address, TelnetMenu *&menu, int timeout, int &last_time, int &radio_pos, RadiosDeque &radios) {
+void runClient (int &sock_udp, struct sockaddr_in &my_address, struct sockaddr_in &broadcast_address, TelnetMenu *&menu, int timeout, int &radio_pos, RadiosDeque &radios) {
   int action = menu->runTelnet(10);
   /* akcja równa 1 oznacza, że ktoś wybrał w menu szukanie pośrednika */
   if (action == 1) {
@@ -154,7 +161,7 @@ void runClient (int &sock_udp, struct sockaddr_in &my_address, struct sockaddr_i
     // std::cerr << "booom selected radio #" << radio_pos << "\n";
     menu->setPlayingPos(radio_pos);
     my_address = radios[radio_pos - 1].first;
-    sendKeepAlive(sock_udp, my_address, last_time);
+    sendKeepAlive(sock_udp, my_address);
   }
   //nic nie odtwarzamy, wiec nikomu nie wysylamy keepalive (czy aby na pewno?)
   if (radio_pos < 0) {
@@ -162,7 +169,8 @@ void runClient (int &sock_udp, struct sockaddr_in &my_address, struct sockaddr_i
   }
   //czy takie mierzenie tego czasu jest ok?
   if (gettimelocal() - radios[radio_pos - 1].second >= 3500000) {
-    sendKeepAlive(sock_udp, my_address, last_time);
+    std::cerr << "wysylam keep alive do " << radios[radio_pos - 1].first.sin_addr.s_addr << "(" << radios[radio_pos - 1].first.sin_port << ")\n";
+    sendKeepAlive(sock_udp, my_address);
     radios[radio_pos - 1].second = gettimelocal();
   }
   receiveStream(sock_udp, menu, timeout, radio_pos, radios);
@@ -185,9 +193,9 @@ int main(int argc, char** argv) {
   menu->addClient(sock_telnet);
   menu->setupTelnet();
 
-  int last_keepalive_time = -1, radio_pos = -1;
+  int radio_pos = -1;
   while (1) {
-    runClient(sock, my_address, broadcast_address, menu, timeout, last_keepalive_time, radio_pos, radios);
+    runClient(sock, my_address, broadcast_address, menu, timeout, radio_pos, radios);
   }
 
   return 0;

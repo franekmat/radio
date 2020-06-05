@@ -153,6 +153,9 @@ public:
   // set playing radio in the telnet menu
   // (by placing then '*' on the right of that radio name)
   void setPlayingPos(int pos) {
+    if (playing_pos != pos && telnet_menu.back() != "Koniec") {
+      telnet_menu.pop_back(); // delete old radio station meta
+    }
     playing_pos = pos;
     writeTelnetMenu();
   }

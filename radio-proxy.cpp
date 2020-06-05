@@ -2,11 +2,6 @@
 #include "connection.h"
 #include "err.h"
 
-#define DEFAULT_TIMEOUT 5
-#define DEFAULT_META "no"
-#define BUFFER_SIZE 4096
-#define HEADER_SIZE 4
-
 typedef std::deque <std::pair<struct sockaddr_in, unsigned long long> > ClientsDeque;
 
 
@@ -439,7 +434,7 @@ int main(int argc, char** argv) {
 
   setTcpClientConnection(sock, host, port);
   setUdpServerConnection(sock_disc, port_clients, true);
-  setUdpServerConnection0(sock_udp, true);
+  setUdpServerConnection(sock_udp, port_clients, false);
 
   std::string message = setRequest(host, resource, meta);
   sendRequest(sock, message);
