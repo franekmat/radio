@@ -135,12 +135,16 @@ void findNewClients(int &sock_disc, int &sock_udp, ClientsDeque &clients, std::s
   while (len > 0) {
     rcva_len = (socklen_t) sizeof(client_address);
     buffer.resize(BUFFER_SIZE + HEADER_SIZE);
-    if (poll(fds, 1, 100) == 0) {
-      break;
-    }
+    // if (poll(fds, 1, 0) == 0) {
+    //   break;
+    // }
     len = recvfrom(sock_disc, &buffer[0], buffer.size(), 0, (struct sockaddr *) &client_address, &rcva_len);
     if (len < 0) {
-      error("error on datagram from client socket");
+      if (errno != EAGAIN) {
+        error("error on datagram from client socket");
+      }
+      break;
+      // error("error on datagram from client socket");
     }
     buffer.resize(len);
 
@@ -172,12 +176,16 @@ void updateClients(int &sock_udp, ClientsDeque &clients, std::string radio_name)
   while (len > 0) {
     rcva_len = (socklen_t) sizeof(client_address);
     buffer.resize(BUFFER_SIZE + HEADER_SIZE);
-    if (poll(fds, 1, 100) == 0) {
-      break;
-    }
+    // if (poll(fds, 1, 0) == 0) {
+    //   break;
+    // }
     len = recvfrom(sock_udp, &buffer[0], buffer.size(), 0, (struct sockaddr *) &client_address, &rcva_len);
     if (len < 0) {
-      error("error on datagram from client socket");
+      if (errno != EAGAIN) {
+        error("error on datagram from client socket");
+      }
+      break;
+      // error("error on datagram from client socket");
     }
     buffer.resize(len);
 
@@ -288,6 +296,7 @@ ssize_t readTCP(int &sock, std::string &tmp, int timeout) {
     error("read");
   }
   tmp.resize(rcv_len);
+  // std::cerr << "size = " << rcv_len << "\n";
   return rcv_len;
 }
 
@@ -316,7 +325,15 @@ void readDataWithoutMeta(int &sock, int &sock_disc, int &sock_udp, std::string &
   ssize_t rcv_len = 1;
 
   while (rcv_len > 0) {
+    // std::string buffer2 = "";
     rcv_len = readTCP(sock, buffer, timeout);
+    // buffer += buffer2;
+    // if (buffer.size() >= 5000) {
+    //   int k = std::max((int)BUFFER_SIZE, (int)buffer.size());
+    //   buffer2 = buffer.substr(0, k);
+    //   printData(buffer2, sock_disc, sock_udp, clients, radio_name);
+    //   buffer.erase(0, k);
+    // }
     printData(buffer, sock_disc, sock_udp, clients, radio_name);
   }
 }

@@ -5,6 +5,8 @@
 
 typedef std::deque <std::pair<struct sockaddr_in, unsigned long long> > RadiosDeque;
 
+std::string bufer = "";
+
 // function, which prints proper usage of the 'name' program
 void printUsageError(std::string name) {
   std::string err_msg = "Usage: " + name + " -H host -P port -p port -T timeout";
@@ -117,21 +119,15 @@ void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos
     return receiveStream(sock_udp, menu, timeout, radio_pos, radios);
   }
 
-  // std::cerr << "o to jest valid...\n";
-  // std::cerr << "radio_pos = " << radio_pos << "\n";
-
   std::string type = getType(bytesToInt(buffer[0], buffer[1]));
   int leng = bytesToInt(buffer[2], buffer[3]);
   buffer.erase(0, 4);
 
-  // std::cerr << "type = " << type << ", length = " << leng << "\n";
-  // if (radio_pos != -1) std::cerr << "uwaga.... " << compareRadios(radio_address, radios[radio_pos - 1].first) << " + " << (type == "AUDIO") << "\n";
-
   if (radio_pos != -1 && type.compare("AUDIO") == 0 && compareRadios(radio_address, radios[radio_pos - 1].first)) {
+
     std::cout << buffer;
-    // std::cerr << "WTFWTWFTWFTW\n";
-    // std::cout.flush();
-    std::cerr << "odebralem stream od " << radios[radio_pos - 1].first.sin_addr.s_addr << "(" << radios[radio_pos - 1].first.sin_port << ")\n";
+
+    std::cerr << "odebralem stream (" << buffer.size() << ") od " << radios[radio_pos - 1].first.sin_addr.s_addr << "(" << radios[radio_pos - 1].first.sin_port << ")\n";
   }
   else if (radio_pos != -1 && type == "METADATA" && compareRadios(radio_address, radios[radio_pos - 1].first)) {
     menu->changeMeta(buffer);
@@ -140,12 +136,18 @@ void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos
     radios.push_back(std::make_pair(radio_address, gettimelocal()));
     menu->addRadio(buffer);
   }
+  // else {
+  //   int xx = std::max(20000, (int)bufer.size());
+  //   std::cout << bufer.substr(0, xx);
+  //   bufer.erase(0, xx);
+  // }
+  // std::cerr << "BUFFER SIZE = " << bufer.size() << "\n";
 }
 
 // function that detects actions on the telnet menu, receive stream from
 // the radio-proxy and send them KEEPALIVE messages
 void runClient (int &sock_udp, struct sockaddr_in &my_address, struct sockaddr_in &broadcast_address, TelnetMenu *&menu, int timeout, int &radio_pos, RadiosDeque &radios) {
-  int action = menu->runTelnet(10);
+  int action = menu->runTelnet(1);
   /* akcja równa 1 oznacza, że ktoś wybrał w menu szukanie pośrednika */
   if (action == 1) {
     for (int i = 0; i < radios.size() + 1; i++) {

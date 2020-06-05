@@ -13,6 +13,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <poll.h>
+#include <fcntl.h>
 #include <deque>
 #include <sys/time.h>
 #include <arpa/inet.h>
@@ -22,7 +23,7 @@
 
 #define DEFAULT_TIMEOUT 5
 #define DEFAULT_META "no"
-#define BUFFER_SIZE 16000
+#define BUFFER_SIZE 1024
 #define HEADER_SIZE 4
 #define DISCOVER 1
 #define IAM 2

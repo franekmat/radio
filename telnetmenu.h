@@ -9,6 +9,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <poll.h>
+#include <fcntl.h>
 #include <stdexcept>
 #include <vector>
 #include "err.h"
@@ -64,6 +65,8 @@ public:
     server.sin_addr.s_addr = htonl(INADDR_ANY);
     server.sin_port = htons(port);
 
+
+
     if (bind(sock, (struct sockaddr*)&server, (socklen_t)sizeof(server)) == -1) {
       error("Binding stream socket");
     }
@@ -81,6 +84,11 @@ public:
     if (msgsock == -1) {
       error("accept");
     }
+
+    if(fcntl(msgsock, F_SETFL, fcntl(sock, F_GETFL) | O_NONBLOCK) < 0) {
+      error("fcntl");
+    }
+
     return msgsock;
   }
 
@@ -200,8 +208,14 @@ public:
     char buf[buf_size];
     struct pollfd fds[1] = {{msgsock, 0 | POLLIN}};
 
-    if (timeout == 0 || poll(fds, 1, timeout) != 0) {
+    // if (timeout == 0 || poll(fds, 1, 0) != 0) {
       len = recv(msgsock, buf, buf_size, 0);
+      if (len < 0) {
+        if (errno != EAGAIN) {
+          error("error on datagram");
+        }
+        return 0;
+      }
       if (arrowUp(buf, len)) {
         curr_pos = std::max(0, curr_pos - 1);
         writeTelnetMenu();
@@ -230,7 +244,7 @@ public:
           return 2;
         }
       }
-    }
+    // }
     return 0;
   }
 };

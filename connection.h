@@ -42,6 +42,9 @@ void setUdpServerConnection(int &sock, int &port, bool binding) {
   // setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval , sizeof(int));
   setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, (const void *)&optval , sizeof(int));
 
+  if(fcntl(sock, F_SETFL, fcntl(sock, F_GETFL) | O_NONBLOCK) < 0) {
+    error("fcntl");
+  }
 
   server_address.sin_family = AF_INET; // IPv4
 	server_address.sin_addr.s_addr = htonl(INADDR_ANY); // listening on all interfaces
