@@ -98,12 +98,15 @@ void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos
   struct pollfd fds[1] = {{sock_udp, 0 | POLLIN}};
 
   buffer.resize(BUFFER_SIZE + HEADER_SIZE);
-  if (poll(fds, 1, timeout * 1000) == 0) {
+  if (radio_pos != -1 && poll(fds, 1, timeout * 1000) == 0) {
     if (radio_pos != -1) {
       menu->deleteRadio(radio_pos);
       radios.erase(radios.begin() + radio_pos - 1);
       radio_pos = -1;
     }
+    return;
+  }
+  else if (radio_pos == -1 && poll(fds, 1, 1) == 0) {
     return;
   }
   rcv_len = recvfrom(sock_udp, &buffer[0], buffer.size(), 0, (struct sockaddr *) &radio_address, &rcva_len);
@@ -133,6 +136,7 @@ void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos
     menu->changeMeta(buffer);
   }
   else if (type == "IAM") {
+    std::cerr << "MAM NOWE RADIO!!!!!!!!!!!!!!!\n";
     radios.push_back(std::make_pair(radio_address, gettimelocal()));
     menu->addRadio(buffer);
   }
@@ -150,9 +154,9 @@ void runClient (int &sock_udp, struct sockaddr_in &my_address, struct sockaddr_i
   int action = menu->runTelnet(1);
   /* akcja równa 1 oznacza, że ktoś wybrał w menu szukanie pośrednika */
   if (action == 1) {
-    for (int i = 0; i < radios.size() + 1; i++) {
+    // for (int i = 0; i < radios.size() + 1; i++) {
       searchProxy(sock_udp, broadcast_address);
-    }
+    // }
     receiveStream(sock_udp, menu, timeout, radio_pos, radios);
   }
   /* akcja równa 2 oznacza, że ktoś wybrał w menu radio do odtwarzania */
@@ -166,11 +170,11 @@ void runClient (int &sock_udp, struct sockaddr_in &my_address, struct sockaddr_i
     sendKeepAlive(sock_udp, my_address);
   }
   //nic nie odtwarzamy, wiec nikomu nie wysylamy keepalive (czy aby na pewno?)
-  if (radio_pos < 0) {
-    return;
-  }
+  // if (radio_pos < 0) {
+  //   return;
+  // }
   //czy takie mierzenie tego czasu jest ok?
-  if (gettimelocal() - radios[radio_pos - 1].second >= 3500000) {
+  if (radio_pos != -1 && gettimelocal() - radios[radio_pos - 1].second >= 3500000) {
     std::cerr << "wysylam keep alive do " << radios[radio_pos - 1].first.sin_addr.s_addr << "(" << radios[radio_pos - 1].first.sin_port << ")\n";
     sendKeepAlive(sock_udp, my_address);
     radios[radio_pos - 1].second = gettimelocal();

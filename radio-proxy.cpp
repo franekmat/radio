@@ -158,6 +158,7 @@ void findNewClients(int &sock_disc, int &sock_udp, ClientsDeque &clients, std::s
       if (snd_len != message.size()) {
         error("error on sending datagram to client socket");
       }
+      std::cerr << "wyslalem DISCOVER do kogos.............\n";
     }
     deleteClient(client_address, clients);
     clients.push_back(std::make_pair(client_address, gettimelocal()));
