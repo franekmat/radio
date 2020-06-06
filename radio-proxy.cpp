@@ -250,11 +250,7 @@ void printMeta (std::string meta, int &sock_disc, int &sock_udp, ClientsDeque &c
 // set request that will be send to the radio server in order to receive
 // response with the stream
 std::string setRequest (std::string host, std::string resource, std::string meta) {
-  std::string message =
-                   "GET " + resource + " HTTP/1.0\r\n" +
-                   "Host: " + host + "\r\n" +
-                   "User-Agent: Orban/Coding Technologies AAC/aacPlus Plugin 1.0 (os=Windows NT 5.1 Service Pack 2)\r\n" +
-                   "Accept: */*\r\n";
+  std::string message = "GET " + resource + " HTTP/1.1\r\n" + "Host: " + host + "\r\n";
   if (meta == "yes") {
     message += "Icy-MetaData: 1\r\n";
   }

@@ -99,12 +99,10 @@ void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos
     if (errno != EAGAIN) {
       error("read");
     }
-    else if (gettimelocal() - radios[radio_pos - 1].second.second >= timeout * 1000000) {
-      if (radio_pos != -1) {
-        menu->deleteRadio(radio_pos);
-        radios.erase(radios.begin() + radio_pos - 1);
-        radio_pos = -1;
-      }
+    else if (radio_pos != -1 && gettimelocal() - radios[radio_pos - 1].second.second >= timeout * 1000000) {
+      menu->deleteRadio(radio_pos);
+      radios.erase(radios.begin() + radio_pos - 1);
+      radio_pos = -1;
     }
     return;
   }
@@ -149,6 +147,7 @@ int runClient (int &sock_udp, struct sockaddr_in &my_address, struct sockaddr_in
     radio_pos = menu->getCurrPos();
     menu->setPlayingPos(radio_pos);
     my_address = radios[radio_pos - 1].first;
+    radios[radio_pos - 1].second.second = gettimelocal();
     sendKeepAlive(sock_udp, my_address);
   }
   // action = 3 means that someone closed connection with telnet menu
