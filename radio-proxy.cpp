@@ -41,7 +41,6 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
         resource_inp = true;
         break;
       case 'p' :
-        checkPort(optarg);
         port_inp = true;
         port = getValueFromString(optarg, "port");
         break;
@@ -50,14 +49,12 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
         meta = optarg;
         break;
       case 't' :
-        checkTimeout(optarg);
         timeout = getValueFromString(optarg, "timeout");
         if (timeout <= 0) {
           error("Timeout value shall be bigger than 0");
         }
         break;
       case 'P' :
-        checkPort(optarg);
         port_clients_inp = true;
         ACTIVATE_CLIENTS = true;
         port_clients = getValueFromString(optarg, "port");
@@ -66,7 +63,6 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
         multi = optarg;
         break;
       case 'T' :
-        checkTimeout(optarg);
         timeout_clients = getValueFromString(optarg, "timeout");
         if (timeout_clients <= 0) {
           error("Timeout value shall be bigger than 0");

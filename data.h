@@ -69,24 +69,10 @@ int getValueFromString (std::string value, std::string whatsthat) {
   return ret_val;
 }
 
-// check if port parameter is valid
-void checkPort (std::string port) {
-  if (0) {
-    error("Invalid port number");
-  }
-}
-
 // check if meta parameter is valid
 void checkMeta (std::string meta) {
   if (meta != "yes" && meta != "no") {
     error ("Wrong format of meta argument");
-  }
-}
-
-// check if timeout parameter is valid
-void checkTimeout (std::string timeout) {
-  if (0) {
-    error("Invalid timeout number");
   }
 }
 

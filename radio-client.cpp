@@ -29,17 +29,14 @@ void parseInput(int argc, char **argv, std::string &host, int &port_udp, int &po
         host_inp = true;
         break;
       case 'P' :
-        checkPort(optarg);
         port_udp_inp = true;
         port_udp = getValueFromString(optarg, "port");
         break;
       case 'p' :
-        checkPort(optarg);
         port_tcp_inp = true;
         port_tcp = getValueFromString(optarg, "port");
         break;
       case 'T' :
-        checkTimeout(optarg);
         timeout = getValueFromString(optarg, "timeout");
         if (timeout <= 0) {
           error("Timeout value shall be bigger than 0");
