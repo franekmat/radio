@@ -96,7 +96,7 @@ void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos
     if (errno != EAGAIN) {
       error("read");
     }
-    else if (radio_pos != -1 && gettimelocal() - radios[radio_pos - 1].second.second >= timeout * 1000000) {
+    else if (radio_pos != -1 && gettimelocal() - radios[radio_pos - 1].second.second >= (unsigned long long)timeout * 1000000) {
       menu->deleteRadio(radio_pos);
       radios.erase(radios.begin() + radio_pos - 1);
       radio_pos = -1;
@@ -111,8 +111,7 @@ void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos
   }
 
   std::string type = getType(bytesToInt(buffer[0], buffer[1]));
-  int leng = bytesToInt(buffer[2], buffer[3]);
-  buffer.erase(0, 4);
+  buffer.erase(0, HEADER_SIZE);
 
   if (radio_pos != -1 && type.compare("AUDIO") == 0 && compareRadios(radio_address, radios[radio_pos - 1].first)) {
     std::cout << buffer;

@@ -74,7 +74,7 @@ private:
   // write all lines of the telnet menu from telnet_menu vector
   void writeTelnetMenu() {
     writeTelnet(CLEAR);
-    for (int i = 0; i < telnet_menu.size(); i++) {
+    for (int i = 0; i < (int)telnet_menu.size(); i++) {
       std::string s = " " + telnet_menu[i]; // space for a cursor  before option name
       if (i == playing_pos) { // that line contains radio that is playing now
         s += POINTER; // place '*' on the right of the radio name
@@ -88,7 +88,7 @@ private:
   std::string getTitleFromMeta(std::string meta) {
     if (meta.substr(0, 13) == "StreamTitle='") {
       std::string res = "";
-      for (int i = 13; i < meta.size() && meta[i] != '\''; i++) {
+      for (int i = 13; i < (int)meta.size() && meta[i] != '\''; i++) {
         res += meta[i];
       }
       return res;
@@ -161,7 +161,6 @@ public:
       telnet_menu.push_back("Koniec");
       telnet_menu.push_back(meta);
     }
-    // curr_pos = 0;
     writeTelnetMenu();
   }
 
@@ -239,7 +238,7 @@ public:
         return 1;
       }
       // close menu
-      else if (curr_pos < telnet_menu.size() && telnet_menu[curr_pos] == "Koniec") {
+      else if (curr_pos < (int)telnet_menu.size() && telnet_menu[curr_pos] == "Koniec") {
         if (close(msgsock) < 0) {
           error("Closing socket");
         }

@@ -17,7 +17,6 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
   int &port, std::string &meta, int &timeout, int &port_clients, int &timeout_clients, std::string &multi) {
   int opt;
   bool host_inp = false, resource_inp = false, port_inp = false;
-  bool port_clients_inp = false;
 
   if (argc < 3) {
     printUsageError(argv[0]);
@@ -48,7 +47,6 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
         }
         break;
       case 'P' :
-        port_clients_inp = true;
         port_clients = getValueFromString(optarg, "port");
         break;
       case 'B' :
@@ -77,7 +75,7 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
 // the function is used to erase client, which sent KEEPALIVE info to the
 // radio-proxy from the deque, before we will add them with updated contact time
 bool deleteClient(struct sockaddr_in &client, ClientsDeque &clients) {
-  for (int i = 0; i < clients.size(); i++) {
+  for (int i = 0; i < (int)clients.size(); i++) {
     if (clients[i].first.sin_addr.s_addr == client.sin_addr.s_addr &&
         clients[i].first.sin_port == client.sin_port) {
       clients.erase(clients.begin() + i);
@@ -89,7 +87,7 @@ bool deleteClient(struct sockaddr_in &client, ClientsDeque &clients) {
 
 // checking if - given as the function argument - client, occurs in clients deque
 bool findClient(struct sockaddr_in &client, ClientsDeque &clients) {
-  for (int i = 0; i < clients.size(); i++) {
+  for (int i = 0; i < (int)clients.size(); i++) {
     if (clients[i].first.sin_addr.s_addr == client.sin_addr.s_addr &&
         clients[i].first.sin_port == client.sin_port) {
       return true;
@@ -135,7 +133,7 @@ void findNewClients(int &sock_disc, int &sock_udp, ClientsDeque &clients, std::s
     if (getType(bytesToInt(buffer[0], buffer[1])) == "DISCOVER" && !findClient(client_address, clients)) {
       std::string message = getUdpHeader("IAM", radio_name.size()) + radio_name;
       ssize_t snd_len = sendto(sock_udp, message.data(), message.size(), 0, (struct sockaddr *) &client_address, rcva_len);
-      if (snd_len != message.size()) {
+      if (snd_len != (int)message.size()) {
         error("error on sending datagram to client socket");
       }
       std::cerr << "wyslalem DISCOVER do kogos.............\n";
@@ -172,7 +170,7 @@ void updateClients(int &sock_udp, ClientsDeque &clients, std::string radio_name)
     if (getType(bytesToInt(buffer[0], buffer[1])) == "DISCOVER" && !findClient(client_address, clients)) {
       std::string message = getUdpHeader("IAM", radio_name.size()) + radio_name;
       ssize_t snd_len = sendto(sock_udp, message.data(), message.size(), 0, (struct sockaddr *) &client_address, rcva_len);
-      if (snd_len != message.size()) {
+      if (snd_len != (int)message.size()) {
         error("error on sending datagram to client socket");
       }
     }
@@ -194,7 +192,7 @@ void sendUdpMessage(int &sock_udp, std::string message, ClientsDeque &clients) {
       std::cout << "sending " << message.size() << " to " << client.first.sin_port << "\n";
       client_address = client.first;
       snd_len = sendto(sock_udp, message.data(), message.size(), 0, (struct sockaddr *) &client_address, snda_len);
-      if (snd_len != message.size()) {
+      if (snd_len != (int)message.size()) {
         error("error on sending datagram to client socket");
       }
     }
@@ -324,14 +322,14 @@ void readMeta (int &sock, int &sock_disc, int &sock_udp, std::string &buffer, in
   }
 
   // if given buffer does not contains whole meta data, we need to read the rest of it
-  if (buffer.size() < size) {
+  if ((int)buffer.size() < size) {
     std::string tmp = "";
     ssize_t rcv_len = 1;
 
     while (rcv_len > 0) {
       rcv_len = readTCP(sock, tmp, timeout);
       buffer += tmp;
-      if (buffer.size() >= size) {
+      if ((int)buffer.size() >= size) {
         break;
       }
     }
@@ -360,7 +358,7 @@ void readDataWithMeta(int &sock, int &sock_disc, int &sock_udp, std::string &buf
     // data size is equal or less than remaining data stream size
     // (which is equal to the metaint), so we know that it doesn't contain
     // any meta data and we can print it
-    if (buffer.size() <= counter) {
+    if ((int)buffer.size() <= counter) {
       counter -= buffer.size();
       printData(buffer, sock_disc, sock_udp, clients, radio_name);
       buffer.clear();

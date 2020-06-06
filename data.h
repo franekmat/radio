@@ -36,7 +36,7 @@
 bool containsOnlyDigits (std::string s) {
   // we want to ignore leading and trailing spaces
   int l = 0, p = s.size() - 1;
-  while (l < s.size() && s[l] == ' ') {
+  while (l < (int)s.size() && s[l] == ' ') {
     l++;
   }
   while (p >= 0 && s[p] == ' ') {
@@ -125,6 +125,8 @@ std::string getType (int n) {
   else {
     error("Incorrect type of data");
   }
+
+  return "";
 }
 
 // checking if received header contains icy-metaint
@@ -202,6 +204,8 @@ std::string getUdpHeader (std::string type, int length) {
   else {
     error ("Incorrect type of data");
   }
+
+  return "";
 }
 
 // checking if received message contains proper header and has valid length
