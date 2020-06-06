@@ -31,21 +31,6 @@
 #define AUDIO 4
 #define METADATA 6
 
-// check if host name is valid
-void checkHostName (std::string host) {
-  //check if proper value
-}
-
-// check if resource name is valid
-void checkResource (std::string resource) {
-  //check if proper value
-}
-
-// check if multi address is valid
-void checkMulti (std::string multi) {
-  //check if proper value
-}
-
 // check if given string contains only digits
 bool containsOnlyDigits (std::string s) {
   // we want to ignore leading and trailing spaces

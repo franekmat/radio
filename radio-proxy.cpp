@@ -33,12 +33,10 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
   while ((opt = getopt(argc, argv, "h:r:p:m:t:P:B:T:")) != EOF) {
     switch(opt) {
       case 'h' :
-        checkHostName(optarg);
         host = optarg;
         host_inp = true;
         break;
       case 'r' :
-        checkResource(optarg);
         resource = optarg;
         resource_inp = true;
         break;
@@ -65,13 +63,12 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
         port_clients = getValueFromString(optarg, "port");
         break;
       case 'B' :
-        checkMulti(optarg);
         multi = optarg;
         break;
       case 'T' :
-        checkTimeout(optarg); //not sure if rules are the same as in -t case
+        checkTimeout(optarg);
         timeout_clients = getValueFromString(optarg, "timeout");
-        if (timeout_clients <= 0) { //tu też?
+        if (timeout_clients <= 0) {
           error("Timeout value shall be bigger than 0");
         }
         break;
@@ -82,7 +79,7 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
     }
   }
 
-  if (!host_inp || !resource_inp || !port_inp) { //dodać port_clients_inp
+  if (!host_inp || !resource_inp || !port_inp) {
     printUsageError(argv[0]);
   }
 }
@@ -451,7 +448,15 @@ int main(int argc, char** argv) {
   parseInput(argc, argv, host, resource, port, meta, timeout, port_clients, timeout_clients, multi);
 
   setTcpClientConnection(sock, host, port);
+  // socket for receiving discover messages from unknown yet clients
+  // (there could be one socket instead of two (sock_disc, sock_udp) if the third
+  // argument in both setUdpServerConnection() functions would be true.
+  // I've made 2 sockets to make it easier in case of testing multiple radio-proxy
+  // on 1 machine with the same address to distinguish such radio stations)
   setUdpServerConnection(sock_disc, port_clients, true);
+  // socket for communicating with known clients
+  // if you would like to run multiple radio-proxy on 1 machine with the same
+  // address, change last argument to 'false' to not make binding
   setUdpServerConnection(sock_udp, port_clients, false);
 
   std::string message = setRequest(host, resource, meta);

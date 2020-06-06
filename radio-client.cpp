@@ -5,8 +5,6 @@
 
 typedef std::deque <std::pair<struct sockaddr_in, unsigned long long> > RadiosDeque;
 
-std::string bufer = "";
-
 // function, which prints proper usage of the 'name' program
 void printUsageError(std::string name) {
   std::string err_msg = "Usage: " + name + " -H host -P port -p port -T timeout";
@@ -27,7 +25,6 @@ void parseInput(int argc, char **argv, std::string &host, int &port_udp, int &po
   while ((opt = getopt(argc, argv, "H:P:p:T:")) != EOF) {
     switch(opt) {
       case 'H' :
-        checkHostName(optarg);
         host = optarg;
         host_inp = true;
         break;
@@ -44,7 +41,7 @@ void parseInput(int argc, char **argv, std::string &host, int &port_udp, int &po
       case 'T' :
         checkTimeout(optarg);
         timeout = getValueFromString(optarg, "timeout");
-        if (timeout <= 0) { //tu też?
+        if (timeout <= 0) {
           error("Timeout value shall be bigger than 0");
         }
         break;
@@ -130,7 +127,7 @@ void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos
 
     std::cout << buffer;
 
-    std::cerr << "odebralem stream (" << buffer.size() << ") od " << radios[radio_pos - 1].first.sin_addr.s_addr << "(" << radios[radio_pos - 1].first.sin_port << ")\n";
+    std::cerr << "odebralem stream (" << buffer.size() << ") od " << radios[radio_pos - 1].first.sin_addr.s_addr << "(" << ntohs(radios[radio_pos - 1].first.sin_port) << ")\n";
   }
   else if (radio_pos != -1 && type == "METADATA" && compareRadios(radio_address, radios[radio_pos - 1].first)) {
     menu->changeMeta(buffer);

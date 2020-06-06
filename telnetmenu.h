@@ -65,8 +65,6 @@ public:
     server.sin_addr.s_addr = htonl(INADDR_ANY);
     server.sin_port = htons(port);
 
-
-
     if (bind(sock, (struct sockaddr*)&server, (socklen_t)sizeof(server)) == -1) {
       error("Binding stream socket");
     }
@@ -76,7 +74,7 @@ public:
     }
   }
 
-  // add a new client - the new radio-proxy
+  // add a new radio-client
   int addClient(int &sock) {
     int client_size = sizeof( struct sockaddr_in);
     struct sockaddr_in client_addr;
@@ -115,7 +113,7 @@ public:
   void writeTelnetMenu() {
     writeTelnet(CLEAR);
     for (int i = 0; i < telnet_menu.size(); i++) {
-      std::string s = " " + telnet_menu[i]; // space before radio name for a cursor
+      std::string s = " " + telnet_menu[i]; // space for a cursor  before option name
       if (i == playing_pos) { // that line contains radio that is playing now
         s += POINTER; // place '*' on the right of the radio name
       }
@@ -206,45 +204,43 @@ public:
   int runTelnet(int timeout) {
     int buf_size = 16, len;
     char buf[buf_size];
-    struct pollfd fds[1] = {{msgsock, 0 | POLLIN}};
 
-    // if (timeout == 0 || poll(fds, 1, 0) != 0) {
-      len = recv(msgsock, buf, buf_size, 0);
-      if (len < 0) {
-        if (errno != EAGAIN) {
-          error("error on datagram");
-        }
-        return 0;
+    len = recv(msgsock, buf, buf_size, 0);
+    if (len < 0) {
+      if (errno != EAGAIN) {
+        error("recv error");
       }
-      if (arrowUp(buf, len)) {
-        curr_pos = std::max(0, curr_pos - 1);
-        writeTelnetMenu();
+      return 0;
+    }
+    if (arrowUp(buf, len)) {
+      curr_pos = std::max(0, curr_pos - 1);
+      writeTelnetMenu();
+    }
+    else if (arrowDown(buf, len)) {
+      int max_size = (int) telnet_menu.size() - 1;
+      if (telnet_menu[max_size] != "Koniec") {
+        max_size--;
       }
-      else if (arrowDown(buf, len)) {
-        int max_size = (int) telnet_menu.size() - 1;
-        if (telnet_menu[max_size] != "Koniec") {
-          max_size--;
-        }
-        curr_pos = std::min(curr_pos + 1, max_size);
-        writeTelnetMenu();
+      curr_pos = std::min(curr_pos + 1, max_size);
+      writeTelnetMenu();
+    }
+    else if (enter(buf, len)) {
+      // search proxy
+      if (curr_pos == 0) {
+        return 1;
       }
-      else if (enter(buf, len)) {
-        // search proxy
-        if (curr_pos == 0) {
-          return 1;
-        }
-        // close menu
-        else if (curr_pos < telnet_menu.size() && telnet_menu[curr_pos] == "Koniec") {
-          if (close(msgsock) < 0) {
-            error("Closing socket");
-          }
-        }
-        // change playing radio
-        else {
-          return 2;
+      // close menu
+      else if (curr_pos < telnet_menu.size() && telnet_menu[curr_pos] == "Koniec") {
+        if (close(msgsock) < 0) {
+          error("Closing socket");
         }
       }
-    // }
+      // change playing radio station
+      else {
+        return 2;
+      }
+    }
+    // we didnt press enter
     return 0;
   }
 };
