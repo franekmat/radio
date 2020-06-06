@@ -2,6 +2,9 @@
 #include "connection.h"
 #include "err.h"
 
+// ClientDeque type: deque of pairs (a, b),
+// where a - radio-client's address, b - time in microsceonds of the last
+// received KEEPALIVE from this radio-client
 typedef std::deque <std::pair<struct sockaddr_in, unsigned long long> > ClientsDeque;
 
 // function, which prints proper usage of the 'name' program

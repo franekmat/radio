@@ -3,6 +3,10 @@
 #include "telnetmenu.h"
 #include "err.h"
 
+// RadiosDeque type: deque of pairs (a, (b, c)),
+// where a - radio-proxy's address, b - time in microseconds of the last sent
+// KEEPALIVE to this radio-proxy, c - time in microsceonds of the last received
+// audio or meta from that radio-proxy
 typedef std::deque <std::pair<struct sockaddr_in, std::pair<unsigned long long, unsigned long long> > > RadiosDeque;
 
 // function, which prints proper usage of the 'name' program

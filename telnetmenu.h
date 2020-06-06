@@ -19,7 +19,7 @@ private:
   const int QUEUE_LENGTH = 5;
   const std::string SETUP_TELNET = "\377\375\042\377\373\001";
   const std::string CLEAR = "\033[H\033[J";
-  const std::string POINTER = " *";
+  const std::string RADIO_POINTER = " *";
   const std::string NEW_LINE = "\r\n";
 
   std::vector<std::string> telnet_menu;
@@ -77,7 +77,7 @@ private:
     for (int i = 0; i < (int)telnet_menu.size(); i++) {
       std::string s = " " + telnet_menu[i]; // space for a cursor  before option name
       if (i == playing_pos) { // that line contains radio that is playing now
-        s += POINTER; // place '*' on the right of the radio name
+        s += RADIO_POINTER; // place ' *' on the right of the radio name
       }
       writeTelnet(s + NEW_LINE);
     }
