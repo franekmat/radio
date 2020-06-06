@@ -147,11 +147,13 @@ int runClient (int &sock_udp, struct sockaddr_in &my_address, struct sockaddr_in
     radios[radio_pos - 1].second.second = gettimelocal();
     sendKeepAlive(sock_udp, my_address);
   }
-  // action = 3 means that someone closed connection with telnet menu
-  else if (action == -1) {
+  // action = -1 means that someone closed connection with telnet menu
+  // without pressing "Koniec" button
+  // action = -2 means that someone pressed "Koniec" button
+  else if (action == -1 || action == -2) {
     return action;
   }
-  if (radio_pos != -1 && gettimelocal() - radios[radio_pos - 1].second.first >= 3500000) {
+  if (radio_pos != -1 && gettimelocal() - radios[radio_pos - 1].second.first >= KEEPALIVE_TIMEOUT_MICROS) {
     std::cerr << "wysylam keep alive do " << radios[radio_pos - 1].first.sin_addr.s_addr << "(" << radios[radio_pos - 1].first.sin_port << ")\n";
     sendKeepAlive(sock_udp, my_address);
     radios[radio_pos - 1].second.first = gettimelocal();
@@ -162,7 +164,7 @@ int runClient (int &sock_udp, struct sockaddr_in &my_address, struct sockaddr_in
 }
 
 int main(int argc, char** argv) {
-  int port_udp = -1, port_tcp = -1, timeout = DEFAULT_TIMEOUT, sock, sock_telnet;
+  int port_udp = -1, port_tcp = -1, timeout = DEFAULT_TIMEOUT_S, sock, sock_telnet;
   std::string host = "";
   struct sockaddr_in my_address;
   RadiosDeque radios;
@@ -178,14 +180,20 @@ int main(int argc, char** argv) {
   menu->addClient(sock_telnet);
   menu->setupTelnet();
 
-  int radio_pos = -1, ret;
-  while (1) {
+  int radio_pos = -1, ret = 0;
+  // ret = -2 means that someone pressed "Koniec" in the telnet menu
+  while (ret != -2) {
     ret = runClient(sock, my_address, broadcast_address, menu, timeout, radio_pos, radios);
+    // ret = -1 means that someone closed connection with telnet menu
+    // without pressing "Koniec", so they are allowed to open menu again
     if (ret == -1) {
       menu->addClient(sock_telnet);
       menu->setupTelnet();
     }
   }
+
+  close(sock);
+  delete menu;
 
   return 0;
 }

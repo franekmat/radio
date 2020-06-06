@@ -214,6 +214,13 @@ public:
       }
       return 0;
     }
+    // forcing close of telnet menu
+    else if (len == 0) {
+      if (close(msgsock) < 0) {
+        error("Closing socket");
+      }
+      return -1;
+    }
     if (arrowUp(buf, len)) {
       curr_pos = std::max(0, curr_pos - 1);
       writeTelnetMenu();
@@ -236,7 +243,7 @@ public:
         if (close(msgsock) < 0) {
           error("Closing socket");
         }
-        return -1;
+        return -2;
       }
       // change playing radio station
       else {

@@ -21,8 +21,9 @@
 #include <algorithm>
 #include "err.h"
 
-#define DEFAULT_TIMEOUT 5
+#define DEFAULT_TIMEOUT_S 5
 #define DEFAULT_META "no"
+#define KEEPALIVE_TIMEOUT_MICROS 3500000
 #define BUFFER_SIZE 1024
 #define HEADER_SIZE 4
 #define DISCOVER 1

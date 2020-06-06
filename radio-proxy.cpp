@@ -4,13 +4,6 @@
 
 typedef std::deque <std::pair<struct sockaddr_in, unsigned long long> > ClientsDeque;
 
-
-// radio-proxy started without paramater -P shall work as stated in
-// the A part of the task
-// ACTIVATE_CLIENTS = false, if there is no -P
-// ACTIVATE_CLIENTS = true, if there is -P
-bool ACTIVATE_CLIENTS = false;
-
 // function, which prints proper usage of the 'name' program
 void printUsageError(std::string name) {
   std::string err_msg = "Usage: " + name + " -h host -r resource -p port -m yes|no -t timeout -P port -B multi -T timeout";
@@ -56,7 +49,6 @@ void parseInput(int argc, char **argv, std::string &host, std::string &resource,
         break;
       case 'P' :
         port_clients_inp = true;
-        ACTIVATE_CLIENTS = true;
         port_clients = getValueFromString(optarg, "port");
         break;
       case 'B' :
@@ -215,7 +207,9 @@ void printData (std::string data, int &sock_disc, int &sock_udp, ClientsDeque &c
   if (data.empty()) {
     return;
   }
-  if (ACTIVATE_CLIENTS) {
+  // port_disc = -1 && sock_udp = -1 means that we didnt receive port -P as arguments,
+  // in such situation stream is simply printed, not send via UDP to anyone
+  if (sock_disc != -1 && sock_udp != -1) {
     findNewClients(sock_disc, sock_udp, clients, radio_name);
     updateClients(sock_udp, clients, radio_name);
     std::string message = getUdpMessage("AUDIO", (int)data.size(), data);
@@ -232,7 +226,9 @@ void printMeta (std::string meta, int &sock_disc, int &sock_udp, ClientsDeque &c
   if (meta.empty()) {
     return;
   }
-  if (ACTIVATE_CLIENTS) {
+  // port_disc = -1 && sock_udp = -1 means that we didnt receive port -P as arguments,
+  // in such situation stream is simply printed, not send via UDP to anyone
+  if (sock_disc != -1 && sock_udp != -1) {
     findNewClients(sock_disc, sock_udp, clients, radio_name);
     updateClients(sock_udp, clients, radio_name);
     std::string message = getUdpMessage("METADATA", (int)meta.size(), meta);
@@ -411,32 +407,39 @@ void handleResponse(int &sock, int &sock_disc, int &sock_udp, std::string &meta,
 
 int main(int argc, char** argv) {
   // for A part of the task
-  int port = -1, timeout = DEFAULT_TIMEOUT, sock;
+  int port = -1, timeout = DEFAULT_TIMEOUT_S, sock;
   std::string host = "", resource = "", meta = DEFAULT_META;
   // for B part of the task
-  int port_clients = -1, timeout_clients = DEFAULT_TIMEOUT, sock_disc, sock_udp;
+  int port_clients = -1, timeout_clients = DEFAULT_TIMEOUT_S, sock_disc = -1, sock_udp = -1;
   std::string multi = "";
   ClientsDeque clients;
 
   parseInput(argc, argv, host, resource, port, meta, timeout, port_clients, timeout_clients, multi);
 
   setTcpClientConnection(sock, host, port);
-  // socket for receiving discover messages from unknown yet clients
-  // (there could be one socket instead of two (sock_disc, sock_udp) if the third
-  // argument in both setUdpServerConnection() functions would be true.
-  // I've made 2 sockets to make it easier in case of testing multiple radio-proxy
-  // on 1 machine with the same address to distinguish such radio stations)
-  setUdpServerConnection(sock_disc, port_clients, true);
-  // socket for communicating with known clients
-  // if you would like to run multiple radio-proxy on 1 machine with the same
-  // address, change last argument to 'false' to not make binding
-  setUdpServerConnection(sock_udp, port_clients, false);
+
+  // port_clients = -1 means that we didnt receive port -P as arguments,
+  // in such situation stream is simply printed, not send to anyone
+  if (port_clients != -1) {
+    // socket for receiving discover messages from unknown yet clients
+    // (there could be one socket instead of two (sock_disc, sock_udp) if the third
+    // argument in both setUdpServerConnection() functions would be true.
+    // I've made 2 sockets to make it easier in case of testing multiple radio-proxy
+    // on 1 machine with the same address to distinguish such radio stations)
+    setUdpServerConnection(sock_disc, port_clients, true);
+    // socket for communicating with known clients
+    // if you would like to run multiple radio-proxy on 1 machine with the same
+    // address, change last argument to 'false' to not make binding
+    setUdpServerConnection(sock_udp, port_clients, false);
+  }
 
   std::string message = setRequest(host, resource, meta);
   sendRequest(sock, message);
   handleResponse(sock, sock_disc, sock_udp, meta, timeout, clients);
 
-  (void) close(sock);
+  close(sock);
+  close(sock_disc);
+  close(sock_udp);
 
   return 0;
 }
