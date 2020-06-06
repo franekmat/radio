@@ -50,6 +50,52 @@ private:
     return false;
   }
 
+  // write string on the telnet menu
+  void writeTelnet(std::string s) {
+    if (write(msgsock, s.data(), s.size()) == -1) {
+      error("send");
+    }
+  }
+
+  // write linux cursor at the beginning on the pos line of the telnet menu
+  void writeCursor(int pos) {
+    writeTelnet("\033[" + std::to_string(pos + 1) + ";1H");
+  }
+
+  // clearing telnet menu vector and add 2 default options
+  void setupTelnetMenu () {
+    // telnet menu might not be empty if we close it and open again after that
+    if (telnet_menu.empty()) {
+      telnet_menu.push_back("Szukaj pośrednika");
+      telnet_menu.push_back("Koniec");
+    }
+  }
+
+  // write all lines of the telnet menu from telnet_menu vector
+  void writeTelnetMenu() {
+    writeTelnet(CLEAR);
+    for (int i = 0; i < telnet_menu.size(); i++) {
+      std::string s = " " + telnet_menu[i]; // space for a cursor  before option name
+      if (i == playing_pos) { // that line contains radio that is playing now
+        s += POINTER; // place '*' on the right of the radio name
+      }
+      writeTelnet(s + NEW_LINE);
+    }
+    writeCursor(curr_pos);
+  }
+
+  // get the title of the playing song from meta data string
+  std::string getTitleFromMeta(std::string meta) {
+    if (meta.substr(0, 13) == "StreamTitle='") {
+      std::string res = "";
+      for (int i = 13; i < meta.size() && meta[i] != '\''; i++) {
+        res += meta[i];
+      }
+      return res;
+    }
+    return " "; // no stream title in the meta string
+  }
+
 public:
 
   TelnetMenu(int port) : port(port) {}
@@ -88,40 +134,6 @@ public:
     }
 
     return msgsock;
-  }
-
-  // write string on the telnet menu
-  void writeTelnet(std::string s) {
-    if (write(msgsock, s.data(), s.size()) == -1) {
-      error("send");
-    }
-  }
-
-  // write linux cursor at the beginning on the pos line of the telnet menu
-  void writeCursor(int pos) {
-    writeTelnet("\033[" + std::to_string(pos + 1) + ";1H");
-  }
-
-  // clearing telnet menu vector and add 2 default options
-  void setupTelnetMenu () {
-    // telnet menu might not be empty if we close it and open again after that
-    if (telnet_menu.empty()) {
-      telnet_menu.push_back("Szukaj pośrednika");
-      telnet_menu.push_back("Koniec");
-    }
-  }
-
-  // write all lines of the telnet menu from telnet_menu vector
-  void writeTelnetMenu() {
-    writeTelnet(CLEAR);
-    for (int i = 0; i < telnet_menu.size(); i++) {
-      std::string s = " " + telnet_menu[i]; // space for a cursor  before option name
-      if (i == playing_pos) { // that line contains radio that is playing now
-        s += POINTER; // place '*' on the right of the radio name
-      }
-      writeTelnet(s + NEW_LINE);
-    }
-    writeCursor(curr_pos);
   }
 
   // setup telnet menu by turning it into character mode and sending all default options
@@ -166,18 +178,6 @@ public:
     }
     playing_pos = pos;
     writeTelnetMenu();
-  }
-
-  // get the title of the playing song from meta data string
-  std::string getTitleFromMeta(std::string meta) {
-    if (meta.substr(0, 13) == "StreamTitle='") {
-      std::string res = "";
-      for (int i = 13; i < meta.size() && meta[i] != '\''; i++) {
-        res += meta[i];
-      }
-      return res;
-    }
-    return meta;
   }
 
   // change title of the song displayed at the end of the menu to the new one
