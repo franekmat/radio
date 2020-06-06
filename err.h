@@ -12,4 +12,4 @@ void error(std::string err_msg)
 }
 
 
-#endif //ERR_H
+#endif // ERR_H

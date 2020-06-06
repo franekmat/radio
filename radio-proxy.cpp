@@ -1,3 +1,4 @@
+// author: Mateusz Frankowski, 385442
 #include "data.h"
 #include "connection.h"
 #include "err.h"
@@ -139,7 +140,6 @@ void findNewClients(int &sock_disc, int &sock_udp, ClientsDeque &clients, std::s
       if (snd_len != (int)message.size()) {
         error("error on sending datagram to client socket");
       }
-      std::cerr << "wyslalem DISCOVER do kogos.............\n";
     }
     deleteClient(client_address, clients);
     clients.push_back(std::make_pair(client_address, gettimelocal()));
@@ -192,7 +192,6 @@ void sendUdpMessage(int &sock_udp, std::string message, ClientsDeque &clients) {
   for (auto client : clients) {
     snda_len = (socklen_t) sizeof(client_address);
     if (current_time - client.second < 5000000) {
-      std::cout << "sending " << message.size() << " to " << client.first.sin_port << "\n";
       client_address = client.first;
       snd_len = sendto(sock_udp, message.data(), message.size(), 0, (struct sockaddr *) &client_address, snda_len);
       if (snd_len != (int)message.size()) {
@@ -218,6 +217,7 @@ void printData (std::string data, int &sock_disc, int &sock_udp, ClientsDeque &c
   }
   else {
     std::cout << data;
+    std::cout.flush();
   }
 }
 
@@ -407,6 +407,7 @@ void handleResponse(int &sock, int &sock_disc, int &sock_udp, std::string &meta,
 }
 
 int main(int argc, char** argv) {
+  std::ios_base::sync_with_stdio(false);
   // for A part of the task
   int port = -1, timeout = DEFAULT_TIMEOUT_S, sock;
   std::string host = "", resource = "", meta = DEFAULT_META;
@@ -419,8 +420,8 @@ int main(int argc, char** argv) {
 
   setTcpClientConnection(sock, host, port);
 
-  // port_clients = -1 means that we didnt receive port -P as arguments,
-  // in such situation stream is simply printed, not send to anyone
+  // port_clients = -1 means that we didnt receive port -P in arguments,
+  // in such situation data is simply printed, not send to anyone via udp
   if (port_clients != -1) {
     // socket for receiving discover messages from unknown yet clients
     // (there could be one socket instead of two (sock_disc, sock_udp) if the third
@@ -429,18 +430,27 @@ int main(int argc, char** argv) {
     // on 1 machine with the same address to distinguish such radio stations)
     setUdpServerConnection(sock_disc, port_clients, true);
     // socket for communicating with known clients
-    // if you would like to run multiple radio-proxy on 1 machine with the same
-    // address, change last argument to 'false' to not make binding
-    setUdpServerConnection(sock_udp, port_clients, false);
+    // (if you would like to run multiple radio-proxy on 1 machine with the same
+    // address, change last argument to 'false' to not make binding, in that case
+    // all radio-proxys will receive DISCOVER on the same port given in arguments,
+    // but to send messages to clients, they will use different ports)
+    setUdpServerConnection(sock_udp, port_clients, true);
   }
 
   std::string message = setRequest(host, resource, meta);
   sendRequest(sock, message);
   handleResponse(sock, sock_disc, sock_udp, meta, timeout, clients);
 
-  close(sock);
-  close(sock_disc);
-  close(sock_udp);
+
+  if (close(sock) < 0) {
+    error("Closing socket");
+  }
+  if (close(sock_disc) < 0) {
+    error("Closing socket");
+  }
+  if (close(sock_udp) < 0) {
+    error("Closing socket");
+  }
 
   return 0;
 }

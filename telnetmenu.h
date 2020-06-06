@@ -185,7 +185,6 @@ public:
       telnet_menu.pop_back();
     }
     telnet_menu.push_back(getTitleFromMeta(s));
-    curr_pos = 0;
     writeTelnetMenu();
   }
 
@@ -254,4 +253,4 @@ public:
   }
 };
 
-#endif /* TELNETMENU_H */
+#endif // TELNETMENU_H

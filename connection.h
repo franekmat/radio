@@ -1,3 +1,6 @@
+#ifndef CONNECTION_H
+#define CONNECTION_H
+
 #include "data.h"
 #include "err.h"
 
@@ -94,3 +97,5 @@ void setUdpClientConnection(int &sock, std::string host, int &port, struct socka
     error("fcntl");
   }
 }
+
+#endif // CONNECTION_H

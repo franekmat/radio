@@ -218,4 +218,4 @@ bool checkReceivedMessage(std::string buffer, int len) {
   return length == len - 4;
 }
 
-#endif //DATA_H
+#endif // DATA_H

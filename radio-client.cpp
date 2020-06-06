@@ -1,3 +1,4 @@
+// author: Mateusz Frankowski, 385442
 #include "data.h"
 #include "connection.h"
 #include "telnetmenu.h"
@@ -119,15 +120,14 @@ void receiveStream(int &sock_udp, TelnetMenu *&menu, int timeout, int &radio_pos
 
   if (radio_pos != -1 && type.compare("AUDIO") == 0 && compareRadios(radio_address, radios[radio_pos - 1].first)) {
     std::cout << buffer;
+    std::cout.flush();
     radios[radio_pos - 1].second.second = gettimelocal();
-    std::cerr << "odebralem stream (" << buffer.size() << ") od " << radios[radio_pos - 1].first.sin_addr.s_addr << "(" << ntohs(radios[radio_pos - 1].first.sin_port) << ")\n";
   }
   else if (radio_pos != -1 && type == "METADATA" && compareRadios(radio_address, radios[radio_pos - 1].first)) {
     radios[radio_pos - 1].second.second = gettimelocal();
     menu->changeMeta(buffer);
   }
   else if (type == "IAM") {
-    std::cerr << "Added new radio station\n";
     radios.push_back(std::make_pair(radio_address, std::make_pair(gettimelocal(), gettimelocal())));
     menu->addRadio(buffer);
   }
@@ -157,7 +157,6 @@ int runClient (int &sock_udp, struct sockaddr_in &my_address, struct sockaddr_in
     return action;
   }
   if (radio_pos != -1 && gettimelocal() - radios[radio_pos - 1].second.first >= KEEPALIVE_TIMEOUT_MICROS) {
-    std::cerr << "wysylam keep alive do " << radios[radio_pos - 1].first.sin_addr.s_addr << "(" << radios[radio_pos - 1].first.sin_port << ")\n";
     sendKeepAlive(sock_udp, my_address);
     radios[radio_pos - 1].second.first = gettimelocal();
   }
@@ -167,6 +166,7 @@ int runClient (int &sock_udp, struct sockaddr_in &my_address, struct sockaddr_in
 }
 
 int main(int argc, char** argv) {
+  std::ios_base::sync_with_stdio(false);
   int port_udp = -1, port_tcp = -1, timeout = DEFAULT_TIMEOUT_S, sock, sock_telnet;
   std::string host = "";
   struct sockaddr_in my_address;
@@ -195,7 +195,9 @@ int main(int argc, char** argv) {
     }
   }
 
-  close(sock);
+  if (close(sock) < 0) {
+    error("Closing socket");
+  }
   delete menu;
 
   return 0;
