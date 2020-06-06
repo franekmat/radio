@@ -89,4 +89,8 @@ void setUdpClientConnection(int &sock, std::string host, int &port, struct socka
   // activate broadcast option
   int optval = 1;
   setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (const void *)&optval , sizeof(int));
+
+  if(fcntl(sock, F_SETFL, fcntl(sock, F_GETFL) | O_NONBLOCK) < 0) {
+    error("fcntl");
+  }
 }

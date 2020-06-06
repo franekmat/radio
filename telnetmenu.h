@@ -83,7 +83,7 @@ public:
       error("accept");
     }
 
-    if(fcntl(msgsock, F_SETFL, fcntl(sock, F_GETFL) | O_NONBLOCK) < 0) {
+    if(fcntl(msgsock, F_SETFL, fcntl(msgsock, F_GETFL) | O_NONBLOCK) < 0) {
       error("fcntl");
     }
 
@@ -104,9 +104,11 @@ public:
 
   // clearing telnet menu vector and add 2 default options
   void setupTelnetMenu () {
-    telnet_menu.clear();
-    telnet_menu.push_back("Szukaj pośrednika");
-    telnet_menu.push_back("Koniec");
+    // telnet menu might not be empty if we close it and open again after that
+    if (telnet_menu.empty()) {
+      telnet_menu.push_back("Szukaj pośrednika");
+      telnet_menu.push_back("Koniec");
+    }
   }
 
   // write all lines of the telnet menu from telnet_menu vector
@@ -234,6 +236,7 @@ public:
         if (close(msgsock) < 0) {
           error("Closing socket");
         }
+        return -1;
       }
       // change playing radio station
       else {

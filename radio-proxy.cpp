@@ -127,21 +127,16 @@ void findNewClients(int &sock_disc, int &sock_udp, ClientsDeque &clients, std::s
   socklen_t rcva_len;
   ssize_t len = 1;
   std::string buffer;
-  struct pollfd fds[1] = {{sock_disc, 0 | POLLIN}};
 
   while (len > 0) {
     rcva_len = (socklen_t) sizeof(client_address);
     buffer.resize(BUFFER_SIZE + HEADER_SIZE);
-    // if (poll(fds, 1, 0) == 0) {
-    //   break;
-    // }
     len = recvfrom(sock_disc, &buffer[0], buffer.size(), 0, (struct sockaddr *) &client_address, &rcva_len);
     if (len < 0) {
       if (errno != EAGAIN) {
         error("error on datagram from client socket");
       }
       break;
-      // error("error on datagram from client socket");
     }
     buffer.resize(len);
 
@@ -169,21 +164,16 @@ void updateClients(int &sock_udp, ClientsDeque &clients, std::string radio_name)
   socklen_t rcva_len;
   ssize_t len = 1;
   std::string buffer;
-  struct pollfd fds[1] = {{sock_udp, 0 | POLLIN}};
 
   while (len > 0) {
     rcva_len = (socklen_t) sizeof(client_address);
     buffer.resize(BUFFER_SIZE + HEADER_SIZE);
-    // if (poll(fds, 1, 0) == 0) {
-    //   break;
-    // }
     len = recvfrom(sock_udp, &buffer[0], buffer.size(), 0, (struct sockaddr *) &client_address, &rcva_len);
     if (len < 0) {
       if (errno != EAGAIN) {
         error("error on datagram from client socket");
       }
       break;
-      // error("error on datagram from client socket");
     }
     buffer.resize(len);
 
@@ -294,7 +284,6 @@ ssize_t readTCP(int &sock, std::string &tmp, int timeout) {
     error("read");
   }
   tmp.resize(rcv_len);
-  // std::cerr << "size = " << rcv_len << "\n";
   return rcv_len;
 }
 
@@ -323,15 +312,7 @@ void readDataWithoutMeta(int &sock, int &sock_disc, int &sock_udp, std::string &
   ssize_t rcv_len = 1;
 
   while (rcv_len > 0) {
-    // std::string buffer2 = "";
     rcv_len = readTCP(sock, buffer, timeout);
-    // buffer += buffer2;
-    // if (buffer.size() >= 5000) {
-    //   int k = std::max((int)BUFFER_SIZE, (int)buffer.size());
-    //   buffer2 = buffer.substr(0, k);
-    //   printData(buffer2, sock_disc, sock_udp, clients, radio_name);
-    //   buffer.erase(0, k);
-    // }
     printData(buffer, sock_disc, sock_udp, clients, radio_name);
   }
 }
@@ -437,10 +418,10 @@ void handleResponse(int &sock, int &sock_disc, int &sock_udp, std::string &meta,
 }
 
 int main(int argc, char** argv) {
-  /* for A part of the task */
+  // for A part of the task
   int port = -1, timeout = DEFAULT_TIMEOUT, sock;
   std::string host = "", resource = "", meta = DEFAULT_META;
-  /* for B part of the task */
+  // for B part of the task
   int port_clients = -1, timeout_clients = DEFAULT_TIMEOUT, sock_disc, sock_udp;
   std::string multi = "";
   ClientsDeque clients;
