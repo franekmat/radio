@@ -214,9 +214,4 @@ bool checkReceivedMessage(std::string buffer, int len) {
   return length == len - 4;
 }
 
-// checking if given address is a multicast address
-bool isMulticastAddress(in_addr_t address) {
-  return (address >> 28) == 14;
-}
-
 #endif //DATA_H
