@@ -1,4 +1,4 @@
-Radio stream transmitter and receiver with control menu via telent.
+Radio stream transmitter and receiver with control menu via telnet.
 
 Usage:
 
